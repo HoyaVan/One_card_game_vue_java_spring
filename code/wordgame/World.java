@@ -1,3 +1,5 @@
+package wordgame;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -16,7 +18,7 @@ public class World {
         countries.put(country.getName(), country); // Key is the country name
     }
 
-    public static World loadWorldMap(String directoryPath) {
+    public static World loadWorldMap(final String directoryPath) {
         File directory = new File(directoryPath);
         World world = new World();
 
@@ -39,7 +41,7 @@ public class World {
         return world;
     }
 
-    private static void parseAndAddCountriesFromFile(File file, World world) {
+    private static void parseAndAddCountriesFromFile(final File file, final World world) {
         try (BufferedReader reader = Files.newBufferedReader(file.toPath())) {
             String line;
             String countryName = null;
@@ -93,4 +95,3 @@ public class World {
         return new HashMap<>(countries); // Return a copy to preserve encapsulation
     }
 }
-

@@ -1,3 +1,5 @@
+package wordgame;
+
 public class Country
 {
     final String name;

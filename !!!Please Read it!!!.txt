@@ -1,0 +1,15 @@
+I'm so Sorry, I didn't have enough time to record the video after fixing all of my problems in game.
+
+
+the word game is working fine in my opinion. 95% except for some edge cases that I couldn't touch due to the lack of time.
+
+
+The number game was halfway done. 50%, because I couldn't invent the score system, but GUI worked okay to put the number in.
+
+
+My intended card game was attacking each other with a certain number of cards. However, I got into so many errors. I had to get rid of that. 
+so, I would give 70%, because it has still some errors.
+I instead brought up the idea If either shape or number matched with the card on the table, u can drop the card. If you drop all your cards faster than the computer-generated user, m
+u win the Game.
+
+Thank you for reading it all.

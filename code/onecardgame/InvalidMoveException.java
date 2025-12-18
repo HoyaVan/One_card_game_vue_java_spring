@@ -1,5 +1,7 @@
+package onecardgame;
+
 public class InvalidMoveException extends Exception {
-    public InvalidMoveException(String message) {
+    public InvalidMoveException(final String message) {
         super(message);
     }
 }

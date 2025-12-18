@@ -1,5 +1,5 @@
-import java.io.BufferedWriter;
-import java.io.FileWriter;
+package wordgame;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,26 +9,32 @@ import java.util.*;
 
 public class WordGame
 {
-
-    private final static String INPUT_DIRECTORY_PATH = "./src";
-    private final static String OUTPUT_DIRECTORY_PATH = "./output";
-    private final static String OUTPUT_SCORE_FILE = "./output/score.txt";
+    private static final String INPUT_DIRECTORY_PATH = "./src";
+    private static final String OUTPUT_DIRECTORY_PATH = "./output";
+    private static final String OUTPUT_SCORE_FILE = "./output/score.txt";
+    private static final int MAX_ROUNDS = 10;
+    private static final int MAX_ATTEMPTS = 2;
+    private static final int QUESTION_TYPES = 3;
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
 
     public static void playTriviaGame()
     {
         final Scanner scanUserQuizAnswer = new Scanner(System.in);
-        Scanner scanReplayResponse = new Scanner(System.in);
+        final Scanner scanReplayResponse = new Scanner(System.in);
         final Random random = new Random();
         final Map<String, Country> countries;
         final List<Country> countryList;
         final List<Score> scores = new ArrayList<>();
+        final World world;
+        Score fileHighScore;
+
         // Ensure the output file, directory exists
         setupOutputEnvironment();
 
         // Reload the file to find the high score
-        Score fileHighScore = Score.parseHighScoreFromFile(OUTPUT_SCORE_FILE);
+        fileHighScore = Score.parseHighScoreFromFile(OUTPUT_SCORE_FILE);
 
-        final World world = World.loadWorldMap(INPUT_DIRECTORY_PATH);
+        world = World.loadWorldMap(INPUT_DIRECTORY_PATH);
         countries = world.getCountries();
         countryList = new ArrayList<>(countries.values());
 
@@ -36,16 +42,14 @@ public class WordGame
 
         boolean playAgain;
 
-//        // Load existing high score from file
-//        Score fileHighScore = Score.parseHighScoreFromFile(OUTPUT_SCORE_FILE);
         do
         {
             Score currentScore = new Score();
             currentScore.incrementTotalGamesPlayed();
 
-            for (int round = 0; round < 10; round++)
+            for (int round = 0; round < MAX_ROUNDS; round++)
             {
-                int questionType = random.nextInt(3) + 1; // Randomly select question type (1, 2, or 3)
+                int questionType = random.nextInt(QUESTION_TYPES) + 1; // Randomly select question type (1, 2, or 3)
                 Country country = countryList.get(random.nextInt(countryList.size())); // Randomly select a country
 
                 switch (questionType)
@@ -72,27 +76,24 @@ public class WordGame
 
             // Print stats for the current round
             cumulativeScore.printRoundStats();
-//            double sessionHighScore = scores.stream()
-//                    .mapToDouble(Score::getAverageScore)
-//                    .max()
-//                    .orElse(0);
 
-            if (cumulativeScore.getAverageScore() > (fileHighScore != null ? fileHighScore.getAverageScore() : 0)) {
+            if (cumulativeScore.getAverageScore() > (fileHighScore != null ? fileHighScore.getAverageScore() : 0))
+            {
                 System.out.printf("CONGRATULATIONS! You are the new high score with an average of %.2f points per game!%n",
                         cumulativeScore.getAverageScore());
-                fileHighScore = currentScore;
-            } else {
+                fileHighScore = cumulativeScore;
+            }
+            else
+            {
                 System.out.printf("You did not beat the high score of %.2f points from %s.%n",
                         fileHighScore.getAverageScore(),
-                        fileHighScore.getDateTimePlayed().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        fileHighScore.getDateTimePlayed().format(DateTimeFormatter.ofPattern(DATE_TIME_PATTERN)));
             }
 
             System.lineSeparator();
 
-
-
             // Ask the user if they want to play again
-            playAgain = validateReplay(scanReplayResponse);
+            playAgain = GameValidator.validateReplay(scanReplayResponse);
 
         } while (playAgain);
 
@@ -110,17 +111,20 @@ public class WordGame
                 .orElse(null);
 
         // Compare session high score with the file high score
-        if (fileHighScore == null || sessionHighScore.getAverageScore() > fileHighScore.getAverageScore()) {
+        if (fileHighScore == null || sessionHighScore.getAverageScore() > fileHighScore.getAverageScore())
+        {
             System.out.printf(
                     "CONGRATULATIONS! You are the new high score with an average of %.2f points per game; the previous record was %.2f points per game on %s.%n",
                     sessionHighScore.getAverageScore(),
                     fileHighScore != null ? fileHighScore.getAverageScore() : 0.0,
                     fileHighScore != null ? fileHighScore.getDateTimePlayed().format(DateTimeFormatter.ofPattern(
-                            "yyyy-MM-dd HH:mm:ss")) : "N/A");
-        } else {
+                            DATE_TIME_PATTERN)) : "N/A");
+        }
+        else
+        {
             System.out.printf("You did not beat the high score of %.2f points per game from %s.%n",
                     fileHighScore.getAverageScore(),
-                    fileHighScore.getDateTimePlayed().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    fileHighScore.getDateTimePlayed().format(DateTimeFormatter.ofPattern(DATE_TIME_PATTERN)));
         }
 
         // printout the game info
@@ -132,32 +136,35 @@ public class WordGame
         System.out.println("Thank you for playing! Goodbye.");
     }
 
-    private static void askCapitalCityToCountry(Scanner scanUserQuizAnswer, Score scoreTracker, Country country)
+    private static void askCapitalCityToCountry(final Scanner scanUserQuizAnswer, final Score scoreTracker, final Country country)
     {
-        for (int attempt = 0; attempt < 2; attempt++)
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             System.out.println("What country has the capital city " + country.getCapitalCityName() + "?");
             String answer = scanUserQuizAnswer.nextLine().trim();
 
-            if (answer.equalsIgnoreCase(country.getName()))
+            if (GameValidator.validateAnswer(answer, country.getName()))
             {
                 if (attempt == 0)
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordFirstAttempt(true);
-                } else
+                }
+                else
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordSecondAttempt(true);
                 }
                 break;
-            } else
+            }
+            else
             {
                 if (attempt == 0)
                 {
                     scoreTracker.recordFirstAttempt(false);
                     System.out.println("Incorrect! You have one more guess.");
-                } else
+                }
+                else
                 {
                     scoreTracker.recordSecondAttempt(false);
                     System.out.println("Incorrect! The correct answer is " + country.getName() + ".");
@@ -166,32 +173,35 @@ public class WordGame
         }
     }
 
-    private static void askCountryToCapitalCity(Scanner scanUserQuizAnswer, Score scoreTracker, Country country)
+    private static void askCountryToCapitalCity(final Scanner scanUserQuizAnswer, final Score scoreTracker, final Country country)
     {
-        for (int attempt = 0; attempt < 2; attempt++)
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             System.out.println("What is the capital city of " + country.getName() + "?");
             String answer = scanUserQuizAnswer.nextLine().trim();
 
-            if (answer.equalsIgnoreCase(country.getCapitalCityName()))
+            if (GameValidator.validateAnswer(answer, country.getCapitalCityName()))
             {
                 if (attempt == 0)
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordFirstAttempt(true);
-                } else
+                }
+                else
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordSecondAttempt(true);
                 }
                 break;
-            } else
+            }
+            else
             {
                 if (attempt == 0)
                 {
                     scoreTracker.recordFirstAttempt(false);
                     System.out.println("Incorrect! You have one more guess.");
-                } else
+                }
+                else
                 {
                     scoreTracker.recordSecondAttempt(false);
                     System.out.println("Incorrect! The correct answer is " + country.getCapitalCityName() + ".");
@@ -200,34 +210,38 @@ public class WordGame
         }
     }
 
-    private static void askFactToCountry(Scanner scanUserQuizAnswer, Score scoreTracker, Country country)
+    private static void askFactToCountry(final Scanner scanUserQuizAnswer, final Score scoreTracker, final Country country)
     {
         String[] facts = country.getFacts();
         final Random random = new Random();
         String randomFact = facts[random.nextInt(facts.length)];
-        for (int attempt = 0; attempt < 2; attempt++)
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             System.out.println("Which country does this describe? \"" + randomFact + "\"");
             String answer = scanUserQuizAnswer.nextLine().trim();
-            if (answer.equalsIgnoreCase(country.getName()))
+
+            if (GameValidator.validateAnswer(answer, country.getName()))
             {
                 if (attempt == 0)
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordFirstAttempt(true);
-                } else
+                }
+                else
                 {
                     System.out.println("Correct!");
                     scoreTracker.recordSecondAttempt(true);
                 }
                 break;
-            } else
+            }
+            else
             {
                 if (attempt == 0)
                 {
                     scoreTracker.recordFirstAttempt(false);
                     System.out.println("Incorrect! You have one more guess.");
-                } else
+                }
+                else
                 {
                     scoreTracker.recordSecondAttempt(false);
                     System.out.println("Incorrect! The correct answer is " + country.getName() + ".");
@@ -236,15 +250,6 @@ public class WordGame
         }
     }
 
-    private static boolean validateReplay(Scanner scanner) {
-        while (true) {
-            System.out.print("Do you want to play again? (yes/no): ");
-            String input = scanner.nextLine().trim().toLowerCase();
-            if (input.equals("yes")) return true;
-            if (input.equals("no")) return false;
-            System.out.println("Invalid input. Please type 'yes' or 'no'.");
-        }
-    }
 
     public static void setupOutputEnvironment()
     {
@@ -259,7 +264,8 @@ public class WordGame
                 // Create the directory
                 Files.createDirectories(outputDirPath);
                 System.out.println("Output directory created: " + outputDirPath.toAbsolutePath());
-            } else
+            }
+            else
             {
                 System.out.println("Output directory already exists: " + outputDirPath.toAbsolutePath());
             }
@@ -270,11 +276,13 @@ public class WordGame
                 // Create the file
                 Files.createFile(outputFilePath);
                 System.out.println("Output file created: " + outputFilePath.toAbsolutePath());
-            } else
+            }
+            else
             {
                 System.out.println("Output file already exists: " + outputFilePath.toAbsolutePath());
             }
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             e.printStackTrace();
         }

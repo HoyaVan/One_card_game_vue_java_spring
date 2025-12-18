@@ -1,4 +1,7 @@
 import java.util.Scanner;
+import wordgame.WordGame;
+import numbergame.NumberGame;
+import onecardgame.OneCardGame;
 
 public class Main
 {
@@ -41,12 +44,12 @@ public class Main
                         case "W":
                             WordGame.playTriviaGame();
                           break;
-//                        case "N":
-//                            game = new NumberGame(); // Create an instance of NumberGame
-//                            break;
-//                        case "M":
-//                            game = new OneCard(); // Create an instance of OneCardGame
-//                            break;
+                        case "N":
+                            NumberGame.main(args); // Launch NumberGame
+                            break;
+                        case "M":
+                            OneCardGame.main(args); // Launch OneCardGame
+                            break;
                         case "Q":
                             System.out.println("Thanks for playing! Goodbye!");
                             playgame.close();

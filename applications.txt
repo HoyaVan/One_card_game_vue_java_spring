@@ -1,0 +1,38 @@
+Week 1:
+    Validation : Class DeckAndPlayerHands - validateDeck and validatePlayCard
+
+    Constructor Chaining : classes JokerCard, NormalCard, FaceCard - chain to Card class
+
+    Stringbuilder : Class DeckAndPlayerHands - generateHandDetails
+
+
+Week 2:
+    Inheritance : All card types (AceCard, JokerCard, FaceCard, NormalCard) inherit from the abstract Card class
+
+    Polymorphism : The overridden getCardEffect method in card subclasses demonstrates runtime polymorphism​
+
+    Exception Handling
+    
+Week 3:
+ 
+    Abstract Class : The Card class is an abstract class with abstract methods like getCardEffect implemented by subclasses​(Card).
+    
+Week 4:
+    Interfaces : The GameParticipantable interface defines a contract for game participants like players and AI, with methods such as takeTurn and isValidPlay​(GameParticipantable)​(AIPlayer).
+    
+Week 5:
+   Collections (List) : DeckAndPlayerHands manages player and AI hands using List collections​(DeckAndPlayerHands).
+
+    Enhanced For Loop : Loops in DeckAndPlayerHands iterate through hands and decks, likely using enhanced for loops for readability​(DeckAndPlayerHands).
+    
+Week 7:
+    Lambdas : In CardFactory, the switch expression uses concise syntax to create card objects, resembling lambda behavior​(CardFactory).
+
+Week 8:
+  Paths, Files, Scanner, Streaming: The OneCardGame class demonstrates file operations using Path and Files to save game states, and uses Scanner for user input​(OneCardGame)​(DeckAndPlayerHands).
+    
+Week 10:
+    Unit Testing : DeckAndPlayerHandsTest class
+
+Week 11:
+    Factory : CardFactory implements the Factory design pattern for creating card objects based on their type​(CardFactory).

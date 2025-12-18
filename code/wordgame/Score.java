@@ -1,14 +1,19 @@
+package wordgame;
+
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 
 public class Score {
-    private LocalDateTime dateTimePlayed = LocalDateTime.now(); // Current game timestamp
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
+    private static final int FIRST_ATTEMPT_SCORE = 2;
+    private static final int SECOND_ATTEMPT_SCORE = 1;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(DATE_TIME_PATTERN);
+
+    private LocalDateTime dateTimePlayed;
     private int numGamesPlayed;
     private int numCorrectFirstAttempt;
     private int numCorrectSecondAttempt;
@@ -16,20 +21,15 @@ public class Score {
     private int totalScore;
 
     public Score() {
-        this.dateTimePlayed = LocalDateTime.now(); // Sets the current timestamp
-        this.numGamesPlayed = 0; // Initializes games played to 0
-        this.numCorrectFirstAttempt = 0; // Initializes correct first attempts to 0
-        this.numCorrectSecondAttempt = 0; // Initializes correct second attempts to 0
-        this.numIncorrectAttempts = 0; // Initializes incorrect attempts to 0
-        this.totalScore = 0; // Initializes total score to 0
+        this(LocalDateTime.now(), 0, 0, 0, 0, 0);
     }
 
-    public Score(LocalDateTime dateTimePlayed,
-                 int numGamesPlayed,
-                 int numCorrectFirstAttempt,
-                 int numCorrectSecondAttempt,
-                 int numIncorrectAttempts,
-                 int totalScore)
+    public Score(final LocalDateTime dateTimePlayed,
+                 final int numGamesPlayed,
+                 final int numCorrectFirstAttempt,
+                 final int numCorrectSecondAttempt,
+                 final int numIncorrectAttempts,
+                 final int totalScore)
     {
         this.dateTimePlayed = dateTimePlayed;
         this.numGamesPlayed = numGamesPlayed;
@@ -46,19 +46,21 @@ public class Score {
     }
 
     // Record first attempt
-    public void recordFirstAttempt(boolean isCorrect) {
+    public void recordFirstAttempt(final boolean isCorrect) {
         if (isCorrect) {
             numCorrectFirstAttempt++;
-            totalScore += 2;
+            totalScore += FIRST_ATTEMPT_SCORE;
         }
     }
 
     // Record second attempt
-    public void recordSecondAttempt(boolean isCorrect) {
+    public void recordSecondAttempt(final boolean isCorrect) {
         if (isCorrect) {
             numCorrectSecondAttempt++;
-            totalScore ++;
-        } else {
+            totalScore += SECOND_ATTEMPT_SCORE;
+        }
+        else
+        {
             numIncorrectAttempts++;
         }
     }
@@ -76,14 +78,13 @@ public class Score {
         return dateTimePlayed;
     }
 
-    public void printRoundStats() {
-        System.out.println(numGamesPlayed + " word games played");
-        System.out.println(numCorrectFirstAttempt + " correct answers on the first attempt");
-        System.out.println(numCorrectSecondAttempt + " Correct answers on second attempt");
-        System.out.println(numIncorrectAttempts + " Incorrect Attempts on two attempts each");
-    }
 
-    public static Score parseHighScoreFromFile(String filePath) {
+    public static Score parseHighScoreFromFile(final String filePath) {
+        if (filePath == null)
+        {
+            throw new IllegalArgumentException("File path cannot be null");
+        }
+
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
             LocalDateTime dateTimePlayed = null;
@@ -93,7 +94,7 @@ public class Score {
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("Date and Time:")) {
                     String dateTimeString = line.split(": ", 2)[1].trim();
-                    dateTimePlayed = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    dateTimePlayed = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ofPattern(DATE_TIME_PATTERN));
                 }
 
                 if (line.startsWith("Average Score:")) {
@@ -120,7 +121,12 @@ public class Score {
         return null; // Return null if parsing fails or file is empty
     }
 
-    public void add(Score other) {
+    public void add(final Score other) {
+        if (other == null)
+        {
+            throw new IllegalArgumentException("Score cannot be null");
+        }
+
         this.numGamesPlayed += other.numGamesPlayed;
         this.numCorrectFirstAttempt += other.numCorrectFirstAttempt;
         this.numCorrectSecondAttempt += other.numCorrectSecondAttempt;
@@ -128,15 +134,14 @@ public class Score {
         this.totalScore += other.totalScore;
     }
 
-    public static void appendScoreToFile(Score score, String SCORE_FILE) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(SCORE_FILE, true))) {
-            score.writeToFile(writer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    
 
-    public static List<Score> readScoresFromFile(String SCORE_FILE) throws IOException {
+    public static List<Score> readScoresFromFile(final String SCORE_FILE) throws IOException {
+        if (SCORE_FILE == null)
+        {
+            throw new IllegalArgumentException("Score file path cannot be null");
+        }
+
         List<Score> scores = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(SCORE_FILE))) {
@@ -145,36 +150,21 @@ public class Score {
 
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("Date and Time:")) {
-                    score = new Score();
+                    score = new Score(LocalDateTime.now(), 0, 0, 0, 0, 0);
                     String[] parts = line.split(": ", 2);
                     if (parts.length == 2) {
-                        score.dateTimePlayed = LocalDateTime.parse(parts[1], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                        score.dateTimePlayed = LocalDateTime.parse(parts[1], DateTimeFormatter.ofPattern(DATE_TIME_PATTERN));
                     }
                 } else if (line.startsWith("Games Played:")) {
-                    String[] parts = line.split(": ", 2);
-                    if (parts.length == 2) {
-                        score.numGamesPlayed = Integer.parseInt(parts[1]);
-                    }
+                    parseGamesPlayed(score, line);
                 } else if (line.startsWith("Correct First Attempts:")) {
-                    String[] parts = line.split(": ", 2);
-                    if (parts.length == 2) {
-                        score.numCorrectFirstAttempt = Integer.parseInt(parts[1]);
-                    }
+                    parseCorrectFirstAttempts(score, line);
                 } else if (line.startsWith("Correct Second Attempts:")) {
-                    String[] parts = line.split(": ", 2);
-                    if (parts.length == 2) {
-                        score.numCorrectSecondAttempt = Integer.parseInt(parts[1]);
-                    }
+                    parseCorrectSecondAttempts(score, line);
                 } else if (line.startsWith("Incorrect Attempts:")) {
-                    String[] parts = line.split(": ", 2);
-                    if (parts.length == 2) {
-                        score.numIncorrectAttempts = Integer.parseInt(parts[1]);
-                    }
+                    parseIncorrectAttempts(score, line);
                 } else if (line.startsWith("Total Score:")) {
-                    String[] parts = line.split(": ", 2);
-                    if (parts.length == 2) {
-                        score.totalScore = Integer.parseInt(parts[1].split(" ")[0]); // Extract numeric score
-                    }
+                    parseTotalScore(score, line);
                 } else if (line.trim().isEmpty() && score != null) {
                     scores.add(score); // Add score to the list at the end of a block
                     score = null;
@@ -190,8 +180,13 @@ public class Score {
         return scores;
     }
 
-    public void writeToFile(BufferedWriter writer) throws IOException {
-        writer.write("Date and Time: " + dateTimePlayed.format(formatter) + System.lineSeparator());
+    public void writeToFile(final BufferedWriter writer) throws IOException {
+        if (writer == null)
+        {
+            throw new IllegalArgumentException("BufferedWriter cannot be null");
+        }
+
+        writer.write("Date and Time: " + dateTimePlayed.format(FORMATTER) + System.lineSeparator());
         writer.write("Games Played: " + numGamesPlayed + System.lineSeparator());
         writer.write("Correct First Attempts: " + numCorrectFirstAttempt + System.lineSeparator());
         writer.write("Correct Second Attempts: " + numCorrectSecondAttempt + System.lineSeparator());
@@ -204,7 +199,7 @@ public class Score {
 
     @Override
     public String toString() {
-        return "Date and Time: " + dateTimePlayed.format(formatter) +
+        return "Date and Time: " + dateTimePlayed.format(FORMATTER) +
                 "\nGames Played: " + numGamesPlayed +
                 "\nCorrect First Attempts: " + numCorrectFirstAttempt +
                 "\nCorrect Second Attempts: " + numCorrectSecondAttempt +
@@ -213,4 +208,98 @@ public class Score {
                 "\n";
     }
 
+    public void printRoundStats() {
+        System.out.println(numGamesPlayed + " word games played");
+        System.out.println(numCorrectFirstAttempt + " correct answers on the first attempt");
+        System.out.println(numCorrectSecondAttempt + " Correct answers on second attempt");
+        System.out.println(numIncorrectAttempts + " Incorrect Attempts on two attempts each");
+    }
+
+    public static void appendScoreToFile(final Score score, final String SCORE_FILE) {
+        if (score == null)
+        {
+            throw new IllegalArgumentException("Score cannot be null");
+        }
+
+        if (SCORE_FILE == null)
+        {
+            throw new IllegalArgumentException("Score file path cannot be null");
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(SCORE_FILE, true))) {
+            score.writeToFile(writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void parseGamesPlayed(final Score score, final String line)
+    {
+        if (score == null)
+        {
+            return;
+        }
+
+        String[] parts = line.split(": ", 2);
+        if (parts.length == 2)
+        {
+            score.numGamesPlayed = Integer.parseInt(parts[1]);
+        }
+    }
+
+    private static void parseCorrectFirstAttempts(final Score score, final String line)
+    {
+        if (score == null)
+        {
+            return;
+        }
+
+        String[] parts = line.split(": ", 2);
+        if (parts.length == 2)
+        {
+            score.numCorrectFirstAttempt = Integer.parseInt(parts[1]);
+        }
+    }
+
+    private static void parseCorrectSecondAttempts(final Score score, final String line)
+    {
+        if (score == null)
+        {
+            return;
+        }
+
+        String[] parts = line.split(": ", 2);
+        if (parts.length == 2)
+        {
+            score.numCorrectSecondAttempt = Integer.parseInt(parts[1]);
+        }
+    }
+
+    private static void parseIncorrectAttempts(final Score score, final String line)
+    {
+        if (score == null)
+        {
+            return;
+        }
+
+        String[] parts = line.split(": ", 2);
+        if (parts.length == 2)
+        {
+            score.numIncorrectAttempts = Integer.parseInt(parts[1]);
+        }
+    }
+
+    private static void parseTotalScore(final Score score, final String line)
+    {
+        if (score == null)
+        {
+            return;
+        }
+
+        String[] parts = line.split(": ", 2);
+        if (parts.length == 2)
+        {
+            score.totalScore = Integer.parseInt(parts[1].split(" ")[0]); // Extract numeric score
+        }
+    }
 }
