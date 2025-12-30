@@ -1,7 +1,0 @@
-The most annoying part of using AI is..
-It is hard to get some help if needed to chain the class.
-
-Use part is that, anything that needs duplicated work could be done in 1 seconds.
-for example, put 'final' for the all argument.
-and also, can catch the missing point quite easily with this.
-for example, 'is there any part that's been combined together'
