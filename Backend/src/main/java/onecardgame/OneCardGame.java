@@ -20,11 +20,21 @@ public class OneCardGame {
     }
 
     public void setup() {
-        Card initialCard = gameState.getDeck().drawCard();
+        // Step 1: Draw first card BEFORE dealing hands (this becomes the first used card)
+        Card initialCard = gameState.drawFromDeck(); // Uses legacy method - deck is full, no reshuffle needed
         gameRule.setInitialCard(initialCard, gameState);
+        
+        // Step 2: Deal initial hands to players from remaining deck
+        gameState.dealInitialCards();
+        
+        // First player must match the initial card, so isInitialTurn remains false
     }
 
     public boolean isGameOver() {
+        // Game cannot be over if it hasn't been set up yet
+        if (gameState.getLastUsedCard() == null) {
+            return false;
+        }
         return gameState.isAIWinner() || gameState.isPlayerWinner()
             || gameState.isAILoser()  || gameState.isPlayerLoser();
     }
@@ -50,6 +60,11 @@ public class OneCardGame {
      * @return true if action was valid, false if game is over
      */
     public boolean processPlayerAction(String action) {
+        // Check if game has been set up (lastUsedCard must exist)
+        if (gameState.getLastUsedCard() == null) {
+            return false;
+        }
+        
         if (isGameOver()) {
             return false;
         }
@@ -59,11 +74,30 @@ public class OneCardGame {
             throw new IllegalStateException("Not player's turn");
         }
         
+        // Normalize action: treat null, empty string, or strings that parse to 0 as draw action ("0")
+        String normalizedAction;
+        if (action == null || action.trim().isEmpty()) {
+            normalizedAction = "0";
+        } else {
+            String trimmed = action.trim();
+            // Check if the trimmed string represents zero (e.g., "0", "00", "000")
+            try {
+                if (Integer.parseInt(trimmed) == 0) {
+                    normalizedAction = "0";
+                } else {
+                    normalizedAction = trimmed;
+                }
+            } catch (NumberFormatException e) {
+                // Not a number, use as-is (could be "SHAPE:1" or other special formats)
+                normalizedAction = trimmed;
+            }
+        }
+        
         // Check if this is a draw action (drawing automatically ends turn)
-        boolean isDrawAction = action != null && action.trim().equals("0");
+        boolean isDrawAction = normalizedAction.equals("0");
         
         // Execute player's action
-        player.takeTurn(gameState, gameRule, dealer.isInitialTurn(), action);
+        player.takeTurn(gameState, gameRule, dealer, dealer.isInitialTurn(), normalizedAction);
         
         // If game ended immediately after player action, return false
         if (isGameOver()) {
@@ -92,6 +126,11 @@ public class OneCardGame {
      * Returns true if game continues, false if game is over.
      */
     public boolean endTurn() {
+        // Check if game has been set up (lastUsedCard must exist)
+        if (gameState.getLastUsedCard() == null) {
+            throw new IllegalStateException("Cannot end turn - game not set up");
+        }
+        
         if (isGameOver()) {
             return false;
         }

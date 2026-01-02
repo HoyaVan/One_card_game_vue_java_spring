@@ -29,10 +29,15 @@ public class GameState {
         this.deck = new Deck();
         this.playerHand = new ArrayList<>();
         this.aiHand = new ArrayList<>();
-        dealInitialCards();
+        // Note: Initial card is drawn in setup() BEFORE dealing hands
+        // This ensures the first card is drawn from the shuffled deck first
     }
 
-    private void dealInitialCards() {
+    /**
+     * Deals initial cards to players.
+     * Called after the first card is drawn in setup().
+     */
+    public void dealInitialCards() {
         GameValidator.validateDeckSize(deck.size(), MINIMUM_CARDS_FOR_DEAL);
         GameValidator.validateDeckNotEmpty(deck.size());
 
@@ -54,12 +59,73 @@ public class GameState {
 
     /**
      * Draws a card from the deck.
+     * If deck goes below 1 card, reshuffles the used card pile (except last card) and adds to deck.
+     * Note: This method requires PlayRule to be passed separately for reshuffling.
+     * 
+     * @param gameRule The PlayRule instance (needed for reshuffling)
+     * @return The card drawn from the deck
+     * @throws IllegalStateException if the deck is empty and cannot be reshuffled
+     */
+    public Card drawFromDeck(PlayRule gameRule) {
+        // Reshuffle if deck has less than 1 card
+        if (deck.size() < 1) {
+            reshuffleDeck(gameRule);
+        }
+        return deck.drawCard();
+    }
+    
+    /**
+     * Draws a card from the deck (legacy method for backward compatibility).
+     * Note: This will throw exception if reshuffling is needed. Use drawFromDeck(PlayRule) instead.
      * 
      * @return The card drawn from the deck
      * @throws IllegalStateException if the deck is empty
      */
     public Card drawFromDeck() {
         return deck.drawCard();
+    }
+    
+    /**
+     * Reshuffles the used card pile (except the last card) and adds them to the deck.
+     * The last card in the used pile remains as the lastUsedCard.
+     * 
+     * @param gameRule The PlayRule instance to access used card pile
+     */
+    public void reshuffleDeck(PlayRule gameRule) {
+        // Get all cards from used pile except the last one
+        List<Card> cardsToReshuffle = gameRule.getUsedCardPileCardsExceptLast();
+        if (cardsToReshuffle.isEmpty()) {
+            throw new IllegalStateException("Cannot reshuffle - no cards available");
+        }
+        
+        // Shuffle and add to deck
+        java.util.Collections.shuffle(cardsToReshuffle);
+        deck.addCards(cardsToReshuffle);
+        
+        // Remove reshuffled cards from used pile (keep only last card)
+        gameRule.removeCardsFromPileExceptLast();
+    }
+    
+    /**
+     * Checks if deck needs reshuffling before drawing a certain number of cards.
+     * 
+     * @param cardsToDraw Number of cards that need to be drawn
+     * @return true if reshuffling is needed, false otherwise
+     */
+    public boolean needsReshuffle(int cardsToDraw) {
+        return deck.size() < cardsToDraw;
+    }
+    
+    /**
+     * Reshuffles deck if needed (when deck < 1 or when trying to draw more than available).
+     * This is a public method that can be called before drawing multiple cards.
+     * 
+     * @param gameRule The PlayRule instance (needed for reshuffling)
+     */
+    public void reshuffleDeckIfNeeded(PlayRule gameRule) {
+        if (deck.size() < 1) {
+            reshuffleDeck(gameRule);
+        }
     }
 
     public Card removeFromPlayerHand(final int index) {

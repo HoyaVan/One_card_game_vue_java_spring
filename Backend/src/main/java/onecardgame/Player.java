@@ -24,10 +24,13 @@ public class Player implements GameParticipantable {
     // Week 2. Exception Handling
     @Override
     public boolean takeTurn(final GameState gameState, 
-                            final PlayRule gameRule, 
+                            final PlayRule gameRule,
+                            final Dealer dealer,
                             final boolean isInitialTurn,
                             final String action) {
         boolean validMove = false;
+        // Track if we're in REST API mode (action provided) vs console mode (action is null)
+        final boolean isRestApiMode = action != null;
 
         while (!validMove) {
             final int accumulatedDraws;
@@ -52,7 +55,7 @@ public class Player implements GameParticipantable {
                     if (!hasAttackableCards) {
                         // No attackable cards with sufficient punishment, automatically draw accumulated cards
                         GameMessages.display(GameMessages.PLAYER_NO_DEFENSE_CARDS);
-                        validMove = handleDrawTurn(gameState, gameRule);
+                        validMove = handleDrawTurn(gameState, gameRule, dealer);
                         continue; // Skip the rest and exit the loop
                     }
                     
@@ -64,19 +67,43 @@ public class Player implements GameParticipantable {
                 final String input = (action != null) ? action.trim() : INPUT_DRAW;
 
                 if (isDrawInput(input)) {
-                    validMove = handleDrawTurn(gameState, gameRule);
+                    validMove = handleDrawTurn(gameState, gameRule, dealer);
                 } else {
                     validMove = handlePlayTurn(gameState, gameRule, isInitialTurn, input);
                 }
             } catch (NumberFormatException e) {
                 GameMessages.display(GameMessages.INVALID_INPUT_NUMBER_OR_DRAW);
                 GameMessages.display(""); // Newline after error message
-            } catch (IllegalArgumentException | InvalidMoveException e) {
+                // In REST API mode, don't retry - fail immediately to prevent infinite loop
+                if (isRestApiMode) {
+                    throw new IllegalArgumentException("Invalid input: " + (action != null ? action : "null"));
+                }
+                // In console mode, continue loop to read new input
+            } catch (IllegalArgumentException e) {
                 GameMessages.display(e.getMessage());
                 GameMessages.display(""); // Newline after error message
+                // In REST API mode, don't retry - fail immediately to prevent infinite loop
+                if (isRestApiMode) {
+                    throw e; // Re-throw to propagate error to processPlayerAction
+                }
+                // In console mode, continue loop to read new input
+            } catch (InvalidMoveException e) {
+                GameMessages.display(e.getMessage());
+                GameMessages.display(""); // Newline after error message
+                // In REST API mode, don't retry - fail immediately to prevent infinite loop
+                // Wrap in IllegalArgumentException so controller can catch it
+                if (isRestApiMode) {
+                    throw new IllegalArgumentException(e.getMessage(), e);
+                }
+                // In console mode, continue loop to read new input
             } catch (IndexOutOfBoundsException e) {
                 GameMessages.displayFormatted(GameMessages.INVALID_INDEX_RANGE, gameState.getPlayerHand().size());
                 GameMessages.display(""); // Newline after error message
+                // In REST API mode, don't retry - fail immediately to prevent infinite loop
+                if (isRestApiMode) {
+                    throw new IllegalArgumentException("Invalid card index: " + (action != null ? action : "null"));
+                }
+                // In console mode, continue loop to read new input
             }
         }
         return true; // Turn completed successfully
@@ -137,15 +164,16 @@ public class Player implements GameParticipantable {
     }
 
     private boolean handleDrawTurn(final GameState gameState,
-                                   final PlayRule gameRule) {
+                                   final PlayRule gameRule,
+                                   final Dealer dealer) {
         final int accumulatedDraws;
 
         accumulatedDraws = gameRule.getAccumulatedDraws();
 
         if (accumulatedDraws > MIN_INDEX) {
-            drawAccumulatedCards(gameState, gameRule, accumulatedDraws);
+            drawAccumulatedCards(gameState, gameRule, dealer, accumulatedDraws);
         } else {
-            drawSingleCard(gameState);
+            drawSingleCard(gameState, gameRule, dealer);
         }
 
         return true; // Turn always ends after drawing
@@ -360,25 +388,23 @@ public class Player implements GameParticipantable {
 
     private void drawAccumulatedCards(final GameState gameState, 
                                       final PlayRule gameRule, 
+                                      final Dealer dealer,
                                       final int accumulatedDraws) {
         GameMessages.displayFormatted(GameMessages.PLAYER_DREW_ACCUMULATED_CARDS, accumulatedDraws);
         
-        for (int i = MIN_INDEX; i < accumulatedDraws; i++) {
-            try {
-                gameState.getPlayerHand().add(gameState.drawFromDeck());
-            } catch (IllegalStateException e) {
-                GameMessages.display(GameMessages.DECK_EMPTY_NO_MORE_CARDS);
-                break;
-            }
+        int cardsDrawn = dealer.drawCards(gameState, gameRule, gameState.getPlayerHand(), accumulatedDraws);
+        
+        if (cardsDrawn < accumulatedDraws) {
+            GameMessages.display(GameMessages.DECK_EMPTY_NO_MORE_CARDS);
         }
+        
         gameRule.resetAccumulatedDraws(); // Reset accumulated draws in PlayRule
     }
 
-    private void drawSingleCard(final GameState gameState) {
-        try {
-            gameState.getPlayerHand().add(gameState.drawFromDeck());
+    private void drawSingleCard(final GameState gameState, final PlayRule gameRule, final Dealer dealer) {
+        if (dealer.drawCard(gameState, gameRule, gameState.getPlayerHand())) {
             GameMessages.display(GameMessages.PLAYER_DREW_CARD);
-        } catch (IllegalStateException e) {
+        } else {
             GameMessages.display(GameMessages.DECK_EMPTY_NO_CARD_DRAWN);
         }
     }

@@ -22,6 +22,33 @@ public class PlayRule {
         this.usedCardPile = new UsedCardPile();
         this.accumulatedDraws = RESET_ACCUMULATED_DRAWS; // Initialize accumulated draws
     }
+    
+    /**
+     * Gets all cards from used pile except the last one (for reshuffling).
+     * The last card must remain as the lastUsedCard.
+     * 
+     * @return List of cards to reshuffle (excluding the last card)
+     */
+    public List<Card> getUsedCardPileCardsExceptLast() {
+        List<Card> allCards = usedCardPile.getCards();
+        if (allCards.size() <= 1) {
+            return new java.util.ArrayList<>(); // No cards to reshuffle (only last card or empty)
+        }
+        // Return all cards except the last one
+        return new java.util.ArrayList<>(allCards.subList(0, allCards.size() - 1));
+    }
+    
+    /**
+     * Removes all cards from used pile except the last one.
+     * Used after reshuffling to keep only the lastUsedCard in the pile.
+     */
+    public void removeCardsFromPileExceptLast() {
+        Card lastCard = usedCardPile.getLastCard();
+        usedCardPile.clear();
+        if (lastCard != null) {
+            usedCardPile.addCard(lastCard); // Keep only the last card
+        }
+    }
 
     public int getAccumulatedDraws() {
         return accumulatedDraws;
@@ -119,7 +146,9 @@ public class PlayRule {
             return true; // Joker can defend against any attack (including another Joker)
         }
         if (card instanceof NumTwoCard && lastUsedCard instanceof NumTwoCard) {
-            return card.getRank() == lastUsedCard.getRank();
+            // NumTwoCard defense requires both same rank AND same shape
+            return card.getRank() == lastUsedCard.getRank() && 
+                   card.getShape().equals(lastUsedCard.getShape());
         }
         return false;
     }

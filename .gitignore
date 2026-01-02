@@ -25,6 +25,12 @@ bin/
 ### VS Code ###
 .vscode/
 
+### Editor Lock Files ###
+.LCK*
+*~
+*.swp
+*.swo
+
 ### Maven ###
 target/
 pom.xml.tag

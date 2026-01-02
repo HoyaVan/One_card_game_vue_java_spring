@@ -40,9 +40,10 @@ public class AIPlayer implements GameParticipantable {
 
     @Override
     public boolean takeTurn(final GameState gameState,
-            final PlayRule gameRule,
-            final boolean isInitialTurn,
-            final String action) {
+                            final PlayRule gameRule,
+                            final Dealer dealer,
+                            final boolean isInitialTurn,
+                            final String action) {
         // AI ignores action parameter - it makes its own decisions
         final int accumulatedDraws;
         GameMessages.display(GameMessages.AI_TURN);
@@ -88,11 +89,11 @@ public class AIPlayer implements GameParticipantable {
                     }
                 } catch (InvalidMoveException e) {
                     // Shouldn't happen, but if it does, draw accumulated cards
-                    handleAccumulatedDraws(gameState, gameRule, accumulatedDraws);
+                    handleAccumulatedDraws(gameState, gameRule, dealer, accumulatedDraws);
                 }
             } else {
                 // No attackable card or decided not to defend, draw accumulated cards
-                handleAccumulatedDraws(gameState, gameRule, accumulatedDraws);
+                handleAccumulatedDraws(gameState, gameRule, dealer, accumulatedDraws);
             }
         } else {
             // Try to play a card first
@@ -105,33 +106,31 @@ public class AIPlayer implements GameParticipantable {
                 tryBlockJoker(gameState, gameRule);
             } else {
                 // No playable card or shouldn't play, draw a card (turn ends after drawing)
-                drawSingleCard(gameState);
+                drawSingleCard(gameState, gameRule, dealer);
             }
         }
         return true;
     }
 
-    private void handleAccumulatedDraws(final GameState gameState, final PlayRule gameRule, final int accumulatedDraws) {
+    private void handleAccumulatedDraws(final GameState gameState, final PlayRule gameRule, final Dealer dealer, final int accumulatedDraws) {
         GameMessages.displayFormatted(GameMessages.AI_DREW_ACCUMULATED_CARDS, accumulatedDraws);
-        for (int i = MIN_INDEX; i < accumulatedDraws; i++) {
-            try {
-                gameState.getAiHand().add(gameState.drawFromDeck());
-            } catch (IllegalStateException e) {
-                GameMessages.display(GameMessages.DECK_EMPTY_NO_MORE_CARDS);
-                break;
-            }
+        
+        int cardsDrawn = dealer.drawCards(gameState, gameRule, gameState.getAiHand(), accumulatedDraws);
+        
+        if (cardsDrawn < accumulatedDraws) {
+            GameMessages.display(GameMessages.DECK_EMPTY_NO_MORE_CARDS);
         }
+        
         GameMessages.display(GameMessages.AI_DREW_ALL_CARDS);
         GameMessages.display(""); // Newline after AI message
         gameRule.resetAccumulatedDraws();
     }
 
-    private void drawSingleCard(final GameState gameState) {
-        try {
-            gameState.getAiHand().add(gameState.drawFromDeck());
+    private void drawSingleCard(final GameState gameState, final PlayRule gameRule, final Dealer dealer) {
+        if (dealer.drawCard(gameState, gameRule, gameState.getAiHand())) {
             GameMessages.display(GameMessages.AI_DREW_CARD);
             GameMessages.display(""); // Newline after AI message
-        } catch (IllegalStateException e) {
+        } else {
             GameMessages.display(GameMessages.DECK_EMPTY_NO_CARD_DRAWN);
             GameMessages.display(""); // Newline after error message
         }

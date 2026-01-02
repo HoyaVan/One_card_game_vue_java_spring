@@ -1,7 +1,8 @@
 package onecardgame;
 
-import onecardgame.cards.Card;
 import java.util.List;
+
+import onecardgame.cards.Card;
 
 /**
  * Data Transfer Object for game state - used for JSON responses to Vue frontend.
@@ -19,15 +20,19 @@ public record GameStateDTO(
     String message
 ) {
     public record CardInfo(
+        int id,
         int index,
-        String displayName,
         String rank,
         String shape
     ) {
         public static CardInfo fromCard(Card card, int index) {
+            // Generate unique ID: combination of index, rank, and shape
+            // This ensures uniqueness even if multiple cards have same rank/shape
+            // Using hash of rank + shape to create stable ID
+            int id = index * 10000 + Math.abs((card.getRank() * 100 + card.getShape().hashCode()) % 10000);
             return new CardInfo(
+                id,
                 index,
-                card.toString(),
                 String.valueOf(card.getRank()),
                 card.getShape()
             );

@@ -27,14 +27,28 @@ public final class CardValidator {
     }
 
     /**
-     * Validates that the card shape is not null or empty.
+     * Validates that the card shape is valid.
+     * Valid shapes: "Hearts", "Diamonds", "Clubs", "Spades", "Any", "RED", "BLACK"
      * 
      * @param shape The card shape to validate
-     * @throws IllegalArgumentException if the shape is null or empty
+     * @throws IllegalArgumentException if the shape is null, empty, or invalid
      */
     public static void validateCardShape(final String shape) {
 
         if (shape == null || shape.isEmpty()) {
+            throw new IllegalArgumentException(GameMessages.INVALID_CARD_SHAPE_ERROR);
+        }
+
+        // Check if shape is one of the valid shapes
+        boolean isValidShape = shape.equals(Card.CARD_SHAPE_HEARTS) ||
+                              shape.equals(Card.CARD_SHAPE_DIAMONDS) ||
+                              shape.equals(Card.CARD_SHAPE_CLUBS) ||
+                              shape.equals(Card.CARD_SHAPE_SPADES) ||
+                              shape.equals(Card.CARD_SHAPE_ANY) ||
+                              shape.equals("RED") ||
+                              shape.equals("BLACK");
+
+        if (!isValidShape) {
             throw new IllegalArgumentException(GameMessages.INVALID_CARD_SHAPE_ERROR);
         }
 

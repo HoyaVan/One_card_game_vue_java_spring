@@ -84,4 +84,16 @@ public class Deck implements Drawable {
     public List<Card> getCards() {
         return cards;
     }
+    
+    /**
+     * Adds cards to the deck (used when reshuffling used card pile).
+     * Cards are added to the bottom of the deck (end of list).
+     * 
+     * @param cardsToAdd List of cards to add to the deck
+     */
+    public void addCards(List<Card> cardsToAdd) {
+        if (cardsToAdd != null && !cardsToAdd.isEmpty()) {
+            cards.addAll(cardsToAdd);
+        }
+    }
 }

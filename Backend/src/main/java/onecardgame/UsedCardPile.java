@@ -35,4 +35,12 @@ class UsedCardPile implements Iterable<Card> {
     public Iterator<Card> iterator() {
         return usedCards.iterator();
     }
+    
+    /**
+     * Clears all cards from the pile.
+     * Used when reshuffling - we keep only the last card.
+     */
+    public void clear() {
+        usedCards.clear();
+    }
 }

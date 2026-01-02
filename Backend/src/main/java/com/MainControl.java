@@ -1,18 +1,24 @@
 package com;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Min;
 import onecardgame.OneCardGame;
 import wordgame.WordGame;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/games")
@@ -23,10 +29,10 @@ public class MainControl{
     private final GameScoreRepository scoreRepository;
     // private final NumberGame numberGame;
 
-    public MainControl(GameScoreRepository scoreRepository) {
-        this.oneCardGame = new OneCardGame();
-        this.wordGame = new WordGame();
+    public MainControl(GameScoreRepository scoreRepository, OneCardGame oneCardGame, WordGame wordGame) {
         this.scoreRepository = scoreRepository;
+        this.oneCardGame = oneCardGame;
+        this.wordGame = wordGame;
         // this.numberGame = new NumberGame();
     }
      
@@ -184,4 +190,3 @@ public class MainControl{
         }
     }
 }
-
