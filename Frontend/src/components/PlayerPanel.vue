@@ -22,39 +22,129 @@
         playCards: [indices: number[]]
     }>()
 
-    // Track selected card IDs (not indices, so selection persists even if hand updates)
-    const selectedIds = ref<Set<number>>(new Set())
+    // Track selected card IDs in order of selection (preserves selection order)
+    const selectedIds = ref<number[]>([])
 
     function toggleSelect(id: number) {
-        if (selectedIds.value.has(id)) {
-            selectedIds.value.delete(id)
+        // Only allow selecting playable cards
+        if (!props.isPlayerTurn) return
+        
+        const card = props.cards?.find(c => c.id === id)
+        if (!card) return
+        
+        // Check if card is playable
+        if (!isCardPlayable(card)) return
+        
+        const index = selectedIds.value.indexOf(id)
+        if (index !== -1) {
+            // Deselect: remove from array
+            selectedIds.value.splice(index, 1)
         } else {
-            selectedIds.value.add(id)
+            // Select: add to end of array (preserves order)
+            selectedIds.value.push(id)
         }
     }
 
-    // Convert selected IDs back to indices for backend API call
+    // Convert selected IDs back to indices in selection order for backend API call
     function getSelectedIndices(): number[] {
         if (!props.cards) return []
-        return props.cards
-            .filter(card => selectedIds.value.has(card.id))
-            .map(card => card.index)
-            .sort((a, b) => a - b) // Sort for backend (plays cards in order)
+        // Create a map of ID to index for quick lookup
+        const idToIndex = new Map<number, number>()
+        props.cards.forEach(card => {
+            idToIndex.set(card.id, card.index)
+        })
+        // Return indices in the order they were selected
+        return selectedIds.value
+            .map(id => idToIndex.get(id))
+            .filter((index): index is number => index !== undefined)
     }
 
-    // Check if a card is playable using backend data
+    // Helper function to check if a card is a face card (Jack, Queen, King)
+    function isFaceCard(card: CardInfo): boolean {
+        const rank = card.rank.toLowerCase()
+        return rank === 'jack' || rank === 'queen' || rank === 'king'
+    }
+
+    // Helper function to check if a card is a normal card (any non-face card)
+    function isNormalCard(card: CardInfo): boolean {
+        return !isFaceCard(card)
+    }
+
+    // Check if a card is playable using backend data and dynamic selection rules
     function isCardPlayable(card: CardInfo): boolean {
         // Only show playable indicator during player's turn
         if (!props.isPlayerTurn) {
             return false
         }
 
-        // Use backend-provided playable card indices
+        // If no cards selected, use backend-provided playable card indices
+        if (selectedIds.value.length === 0) {
+            if (props.playableCardIndices && props.playableCardIndices.length > 0) {
+                return props.playableCardIndices.includes(card.index)
+            }
+            return false
+        }
+
+        // Get selected cards in order
+        const selectedCards = selectedIds.value
+            .map(id => props.cards?.find(c => c.id === id))
+            .filter((c): c is CardInfo => c !== undefined)
+
+        if (selectedCards.length === 0) return false
+
+        const firstSelected = selectedCards[0]
+
+        // Rule 1: If first selected card is a face card, allow same shape cards
+        if (isFaceCard(firstSelected)) {
+            const firstShape = firstSelected.shape.toLowerCase()
+            
+            // Check if all selected cards so far are face cards of the same shape
+            const allFaceCardsSameShape = selectedCards.every(c => 
+                isFaceCard(c) && c.shape.toLowerCase() === firstShape
+            )
+
+            // Check if a normal card has been selected
+            const hasNormalCard = selectedCards.some(c => isNormalCard(c))
+
+            if (hasNormalCard) {
+                // Rule 2: After face cards of same shape, if normal card selected, allow same rank normal cards
+                const firstNormalCard = selectedCards.find(c => isNormalCard(c))
+                if (firstNormalCard) {
+                    // Only allow normal cards with same rank
+                    return isNormalCard(card) && card.rank === firstNormalCard.rank
+                }
+            } else if (allFaceCardsSameShape) {
+                // Still selecting face cards - must match shape
+                if (isFaceCard(card)) {
+                    return card.shape.toLowerCase() === firstShape
+                }
+                // Allow normal cards that match the shape
+                if (isNormalCard(card)) {
+                    return card.shape.toLowerCase() === firstShape
+                }
+            }
+        } else {
+            // Rule 3: If first selected card is a normal card, allow same rank cards
+            // BUT only if the first card was playable according to backend rules
+            if (isNormalCard(firstSelected)) {
+                // First, check if the first selected card was actually playable
+                const firstCardWasPlayable = props.playableCardIndices && 
+                    props.playableCardIndices.includes(firstSelected.index)
+                
+                if (firstCardWasPlayable) {
+                    // Only allow cards with the same rank if first card was playable
+                    return card.rank === firstSelected.rank
+                }
+                // If first card wasn't playable, don't allow any additional selections
+                return false
+            }
+        }
+
+        // Fallback: use backend-provided playable card indices
         if (props.playableCardIndices && props.playableCardIndices.length > 0) {
             return props.playableCardIndices.includes(card.index)
         }
 
-        // Fallback: if no playable indices provided, assume none are playable
         return false
     }
 
@@ -87,8 +177,13 @@
         if (indices.length > 0) {
             emit('playCards', indices)
             // Clear selection after playing
-            selectedIds.value.clear()
+            selectedIds.value = []
         }
+    }
+
+    // Handle clearing selection
+    function handleClearSelection() {
+        selectedIds.value = []
     }
 </script>
 
@@ -104,7 +199,7 @@
                 v-for="card in (cards || [])"
                 :key="card.id"
                 :card="card"
-                :isSelected="isOwnPanel && selectedIds.has(card.id)"
+                :isSelected="isOwnPanel && selectedIds.includes(card.id)"
                 :isPlayable="isOwnPanel && isCardPlayable(card)"
                 :showBack="!isOwnPanel"
                 @select="toggleSelect"
@@ -131,9 +226,18 @@
                 Draw Card
             </button>
             
+            <!-- Clear Selection button - shows when multiple cards are selected -->
+            <button 
+                v-if="selectedIds.length > 1 && isPlayerTurn"
+                class="clear-btn"
+                @click="handleClearSelection"
+            >
+                Clear Selection
+            </button>
+            
             <!-- Play Cards button -->
             <button 
-                v-if="selectedIds.size > 0 && isPlayerTurn"
+                v-if="selectedIds.length > 0 && isPlayerTurn"
                 class="play-btn"
                 @click="handlePlayCards"
             >
@@ -228,7 +332,8 @@
 
 .draw-btn,
 .one-card-btn,
-.play-btn {
+.play-btn,
+.clear-btn {
     padding: 12px 24px;
     font-size: 16px;
     font-weight: bold;
@@ -270,6 +375,17 @@
     background: #059669;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.clear-btn {
+    background: #6b7280;
+    color: white;
+}
+
+.clear-btn:hover {
+    background: #4b5563;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
 }
 
 @keyframes pulse {

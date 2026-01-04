@@ -36,10 +36,9 @@ public class Deck implements Drawable {
                 cards.add(CardFactory.createCard(rank, shape));
             }
         }
-        // Add Joker cards
-        for (int i = MIN_INDEX; i < NUMBER_OF_JOKERS; i++) {
-            cards.add(CardFactory.createCard(Card.JOKER_NUMBER, Card.CARD_SHAPE_ANY));
-        }
+        // Add Joker cards - one red, one black
+        cards.add(CardFactory.createCard(Card.JOKER_NUMBER, "RED"));
+        cards.add(CardFactory.createCard(Card.JOKER_NUMBER, "BLACK"));
         Collections.shuffle(cards); // Shuffle the deck
     }
 

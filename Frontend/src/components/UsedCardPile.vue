@@ -33,7 +33,7 @@ const cardsToShow = computed<CardInfo[]>(() => {
                 :style="{ 
                     position: 'relative',
                     marginLeft: index > 0 ? '-60px' : '0',
-                    zIndex: index + 1,
+                    zIndex: cardsToShow.length - index,
                     transform: index > 0 ? `rotate(${(index - cardsToShow.length / 2) * 1.5}deg)` : 'none',
                     transition: 'all 0.3s ease'
                 }"
@@ -63,5 +63,14 @@ const cardsToShow = computed<CardInfo[]>(() => {
     position: relative;
     height: 120px;
     justify-content: center;
+}
+
+.pile-cards :deep(.card) {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.pile-cards :deep(.card img) {
+    opacity: 1 !important;
 }
 </style>

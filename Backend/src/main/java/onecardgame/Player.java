@@ -291,12 +291,17 @@ public class Player implements GameParticipantable {
             cardsToPlay[i] = gameState.getPlayerHand().get(cardIndices[i]);
         }
         
-        // Validate all cards have the same rank (number/face value)
-        // This works for: numbers (1-13), J (11), Q (12), K (13), Ace (1), Joker (-1)
+        // Validate card rank matching rules:
+        // - If first card is a FaceCard (Jack, Queen, King), different ranks are allowed
+        // - Otherwise, all cards must have the same rank
+        boolean firstCardIsFaceCard = cardsToPlay[0] instanceof FaceCard;
+        if (!firstCardIsFaceCard) {
+            // All cards must have the same rank if first card is not a FaceCard
         int firstRank = cardsToPlay[0].getRank();
         for (int i = 1; i < cardsToPlay.length; i++) {
             if (cardsToPlay[i].getRank() != firstRank) {
-                throw new InvalidMoveException("All dropped cards must have the same rank (number or face value)");
+                    throw new InvalidMoveException("All dropped cards must have the same rank (number or face value), unless the first card is a face card (Jack, Queen, King)");
+                }
             }
         }
         
@@ -316,21 +321,94 @@ public class Player implements GameParticipantable {
         // Validate first card is playable
         GameValidator.validateCardPlayable(cardsToPlay[0], lastUsedCard, isInitialTurn, gameRule);
         
-        // Play all cards (must play in reverse order to maintain correct indices)
-        // Sort indices in descending order to avoid index shifting issues
-        java.util.Arrays.sort(cardIndices);
-        for (int i = cardIndices.length - 1; i >= 0; i--) {
-            Card card = cardsToPlay[i];
-            
-            // NumSevenCard cannot be played in multiples
-            if (card instanceof NumSevenCard) {
-                throw new InvalidMoveException("NumSevenCard cannot be played with other cards");
+        // If first card is a FaceCard, subsequent cards can have different ranks
+        // but they still need to be playable. Since FaceCard allows playing another card,
+        // we validate subsequent cards against the FaceCard (which becomes lastUsedCard)
+        if (firstCardIsFaceCard && cardsToPlay.length > 1) {
+            // After the FaceCard is played, it becomes the lastUsedCard
+            // Validate each subsequent card is playable after the previous card
+            Card currentLastCard = cardsToPlay[0]; // FaceCard becomes the new lastUsedCard
+            for (int i = 1; i < cardsToPlay.length; i++) {
+                try {
+                    // Validate each subsequent card is playable
+                    // FaceCard effect allows playing another card, so normal matching rules apply
+                    GameValidator.validateCardPlayable(cardsToPlay[i], currentLastCard, false, gameRule);
+                    // This card becomes the lastUsedCard for the next card
+                    currentLastCard = cardsToPlay[i];
+                } catch (InvalidMoveException e) {
+                    throw new InvalidMoveException("Card at index " + (cardIndices[i] + 1) + " is not playable: " + e.getMessage());
+                }
+            }
+        }
+        
+        // Play cards in the order they were selected (preserve selection order)
+        // To handle index shifting, we find each card's current index as we go
+        // Since we're playing in selection order, indices may shift, but we use indexOf() to find the current position
+        
+        // Check if NumSevenCard is being played - special handling needed
+        boolean hasNumSevenCard = false;
+        int numSevenCardIndex = -1;
+        for (int i = 0; i < cardsToPlay.length; i++) {
+            if (cardsToPlay[i] instanceof NumSevenCard) {
+                hasNumSevenCard = true;
+                numSevenCardIndex = i;
+                break;
+            }
+        }
+        
+        // NumSevenCard can only be played with other cards if:
+        // 1. It's selected after face cards of the same shape, OR
+        // 2. It's the only card being played
+        if (hasNumSevenCard && cardsToPlay.length > 1) {
+            // Check if NumSevenCard is after face cards of same shape
+            boolean allowedWithFaceCards = false;
+            if (numSevenCardIndex > 0) {
+                // Check if all cards before NumSevenCard are face cards of the same shape
+                Card numSevenCard = cardsToPlay[numSevenCardIndex];
+                String numSevenShape = numSevenCard.getShape();
+                boolean allPreviousAreFaceCardsSameShape = true;
+                for (int i = 0; i < numSevenCardIndex; i++) {
+                    Card prevCard = cardsToPlay[i];
+                    if (!(prevCard instanceof FaceCard) || 
+                        !prevCard.getShape().equals(numSevenShape)) {
+                        allPreviousAreFaceCardsSameShape = false;
+                        break;
+                    }
+                }
+                allowedWithFaceCards = allPreviousAreFaceCardsSameShape;
             }
             
-            // Play the card - this will update accumulatedDraws in PlayRule
-            gameRule.playCard(gameState.getPlayerHand(), cardIndices[i]);
-            GameMessages.display(""); // Newline before "You played" message
-            GameMessages.displayFormatted(GameMessages.PLAYER_PLAYED_CARD, card);
+            if (!allowedWithFaceCards) {
+                throw new InvalidMoveException("NumSevenCard cannot be played with other cards");
+            }
+        }
+        
+        for (int i = 0; i < cardsToPlay.length; i++) {
+            Card card = cardsToPlay[i];
+            
+            // Find current index of this card in the hand (may have shifted due to previous removals)
+            int currentIndex = gameState.getPlayerHand().indexOf(card);
+            if (currentIndex == -1) {
+                throw new InvalidMoveException("Card not found in hand");
+            }
+            
+            // Handle NumSevenCard specially - it needs shape selection
+            if (card instanceof NumSevenCard) {
+                // NumSevenCard played after face cards - use the shape from the face cards
+                // The shape should match the face cards that were played before it
+                String newShape = card.getShape(); // Use the card's current shape (same as face cards)
+                // Remove card from hand first
+                gameState.getPlayerHand().remove(currentIndex);
+                // Play with the shape (which matches the face cards)
+                gameRule.playNumSevenCard((NumSevenCard) card, newShape, false);
+                GameMessages.display(""); // Newline before "You played" message
+                GameMessages.displayFormatted(GameMessages.PLAYER_PLAYED_CARD, card);
+            } else {
+                // Play the card - this will update accumulatedDraws in PlayRule and remove it from hand
+                gameRule.playCard(gameState.getPlayerHand(), currentIndex);
+                GameMessages.display(""); // Newline before "You played" message
+                GameMessages.displayFormatted(GameMessages.PLAYER_PLAYED_CARD, card);
+            }
         }
         
         // Update the last used card (last card played)

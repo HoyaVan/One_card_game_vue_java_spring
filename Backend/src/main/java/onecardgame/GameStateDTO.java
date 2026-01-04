@@ -27,6 +27,26 @@ public record GameStateDTO(
         String rank,
         String shape
     ) {
+        /**
+         * Converts card rank number to string format matching frontend image file names.
+         * - 1 -> "ace"
+         * - 11 -> "jack"
+         * - 12 -> "queen"
+         * - 13 -> "king"
+         * - -1 -> "joker"
+         * - 2-10 -> number as string
+         */
+        private static String rankToString(int rank) {
+            return switch (rank) {
+                case Card.ACE_NUMBER -> "ace";
+                case Card.JACK_NUMBER -> "jack";
+                case Card.QUEEN_NUMBER -> "queen";
+                case Card.KING_NUMBER -> "king";
+                case Card.JOKER_NUMBER -> "joker";
+                default -> String.valueOf(rank);
+            };
+        }
+        
         public static CardInfo fromCard(Card card, int index) {
             // Generate unique ID: combination of index, rank, and shape
             // This ensures uniqueness even if multiple cards have same rank/shape
@@ -35,7 +55,7 @@ public record GameStateDTO(
             return new CardInfo(
                 id,
                 index,
-                String.valueOf(card.getRank()),
+                rankToString(card.getRank()),
                 card.getShape()
             );
         }

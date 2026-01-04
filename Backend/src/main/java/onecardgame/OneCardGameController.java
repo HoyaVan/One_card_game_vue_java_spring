@@ -134,17 +134,28 @@ public class OneCardGameController {
                 return ResponseEntity.ok(new GameResponse(dto, false, message, events));
             }
             
+            // Check if turn was kept (player still has turn after face card + draw)
+            boolean isStillPlayerTurn = game.getDealer().getCurrentPlayerIndex() == 0;
+            
             // Detect what happened: card played or drawn
             if (isDraw) {
                 int cardsDrawn = playerHandSizeBefore < game.getGameState().getPlayerHand().size() 
                     ? game.getGameState().getPlayerHand().size() - playerHandSizeBefore 
                     : 1; // Default to 1 if can't detect
                 events.add(GameEvent.drewCard("PLAYER", cardsDrawn, game.getGameRule().getAccumulatedDraws()));
-                events.add(GameEvent.turnEnded("PLAYER"));
-                events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
-                // Note: AI turn will be handled by separate endpoint for step-by-step visualization
-                return ResponseEntity.ok(new GameResponse(dto, true, 
-                    "Card drawn. Call /ai-turn to see AI's move.", events));
+                
+                // Only end turn if it's not kept (face card scenario)
+                if (!isStillPlayerTurn) {
+                    events.add(GameEvent.turnEnded("PLAYER"));
+                    events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
+                    // Note: AI turn will be handled by separate endpoint for step-by-step visualization
+                    return ResponseEntity.ok(new GameResponse(dto, true, 
+                        "Card drawn. Call /ai-turn to see AI's move.", events));
+                } else {
+                    // Turn kept - player can play again
+                    return ResponseEntity.ok(new GameResponse(dto, true, 
+                        "Card drawn. Your turn continues.", events));
+                }
             } else {
                 // Card was played - detect if it's attack or defense
                 Card newLastCard = game.getGameState().getLastUsedCard();
@@ -186,10 +197,18 @@ public class OneCardGameController {
                         }
                     }
                 }
-                events.add(GameEvent.turnEnded("PLAYER"));
-                events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
-                return ResponseEntity.ok(new GameResponse(dto, true, 
-                    "Card played. Turn ended. Call /ai-turn to see AI's move.", events));
+                
+                // Only end turn if it's not kept (face card scenario)
+                if (!isStillPlayerTurn) {
+                    events.add(GameEvent.turnEnded("PLAYER"));
+                    events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
+                    return ResponseEntity.ok(new GameResponse(dto, true, 
+                        "Card played. Turn ended. Call /ai-turn to see AI's move.", events));
+                } else {
+                    // Turn kept - player can play again (face card was played, card drawn, turn continues)
+                    return ResponseEntity.ok(new GameResponse(dto, true, 
+                        "Card played. Your turn continues.", events));
+                }
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             GameStateDTO dto = GameStateDTO.fromGameState(

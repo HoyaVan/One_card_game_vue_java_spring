@@ -9,6 +9,11 @@ public class JokerCard extends Card implements Attackable {
         super(Card.JOKER_NUMBER, Card.CARD_SHAPE_ANY);
         this.punishmentValue = PUNISHMENT_VALUE;
     }
+    
+    public JokerCard(String shape) {
+        super(Card.JOKER_NUMBER, shape);
+        this.punishmentValue = PUNISHMENT_VALUE;
+    }
 
     @Override
     public int getPunishment() {

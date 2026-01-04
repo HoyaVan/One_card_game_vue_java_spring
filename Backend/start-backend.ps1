@@ -1,6 +1,6 @@
-# Stop any process using port 8080
-Write-Host "Checking for processes on port 8080..."
-$processes = netstat -ano | findstr :8080 | ForEach-Object {
+# Stop any process using port 8081
+Write-Host "Checking for processes on port 8081..."
+$processes = netstat -ano | findstr :8081 | ForEach-Object {
     $parts = $_ -split '\s+'
     if ($parts.Length -gt 0) {
         $parts[-1]
@@ -8,7 +8,7 @@ $processes = netstat -ano | findstr :8080 | ForEach-Object {
 } | Select-Object -Unique
 
 if ($processes) {
-    Write-Host "Stopping processes on port 8080..."
+    Write-Host "Stopping processes on port 8081..."
     foreach ($pid in $processes) {
         if ($pid -match '^\d+$') {
             try {

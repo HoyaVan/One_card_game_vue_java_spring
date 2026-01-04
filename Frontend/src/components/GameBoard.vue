@@ -457,14 +457,6 @@ const aiHandCards = computed<CardInfo[]>(() => {
                 @oneCard="handleOneCard"
                 @playCards="handlePlayCards"
             />
-            
-            <Hands
-                :cards="gameState.playerHand"
-                :isPlayerTurn="gameState.isPlayerTurn"
-                :lastUsedCard="gameState.lastUsedCard"
-                :accumulatedDraws="gameState.accumulatedDraws"
-                :playableCardIndices="gameState.playableCardIndices"
-            />
         </div>
         
         <div v-else>

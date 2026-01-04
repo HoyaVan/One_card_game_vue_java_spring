@@ -1,6 +1,9 @@
 package onecardgame;
 
+import java.util.List;
+
 import onecardgame.cards.Card;
+import onecardgame.cards.FaceCard;
 
 public class OneCardGame {
 
@@ -93,6 +96,9 @@ public class OneCardGame {
             }
         }
         
+        // Store last card before action to detect if face card was just played
+        Card lastCardBefore = gameState.getLastUsedCard();
+        
         // Execute player's action
         player.takeTurn(gameState, gameRule, dealer, dealer.isInitialTurn(), normalizedAction);
         
@@ -101,9 +107,41 @@ public class OneCardGame {
             return false;
         }
         
+        // Check if a face card was just played (last card changed and is now a face card)
+        // and player has no playable cards - must draw automatically but keep turn
+        Card lastCardAfter = gameState.getLastUsedCard();
+        boolean shouldKeepTurn = false;
+        if (lastCardAfter != null && lastCardAfter != lastCardBefore && 
+            lastCardAfter instanceof FaceCard) {
+            // Face card was just played - check if player has any playable cards
+            List<Card> playableCards = gameRule.getPlayableCards(
+                gameState.getPlayerHand(), 
+                lastCardAfter, 
+                false // Not initial turn anymore
+            );
+            
+            // If no playable cards, automatically draw a card but keep player's turn
+            if (playableCards.isEmpty()) {
+                // Player must draw a card after face card if no playable cards
+                // But they get one more turn (no transition to AI)
+                player.takeTurn(gameState, gameRule, dealer, false, "0");
+                
+                // Check if game ended after drawing
+                if (isGameOver()) {
+                    return false;
+                }
+                
+                // Keep player's turn - don't advance to AI
+                shouldKeepTurn = true;
+            }
+        }
+        
         // After any action (draw or play cards), automatically advance to AI turn
-        // Vue will call /ai-turn endpoint separately for step-by-step visualization
-        dealer.advanceToNextPlayer();
+        // UNLESS face card was played and player had to draw (then keep player's turn)
+        if (!shouldKeepTurn) {
+            // Vue will call /ai-turn endpoint separately for step-by-step visualization
+            dealer.advanceToNextPlayer();
+        }
         
         // If game is over after player's turn, return false
         if (isGameOver()) {

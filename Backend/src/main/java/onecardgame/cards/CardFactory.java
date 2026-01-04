@@ -20,7 +20,7 @@ public class CardFactory {
             case Card.JACK_NUMBER -> new FaceCard(Card.JACK_NUMBER, shape); // Jack: allows additional play
             case Card.QUEEN_NUMBER -> new FaceCard(Card.QUEEN_NUMBER, shape); // Queen: allows additional play
             case Card.KING_NUMBER -> new FaceCard(Card.KING_NUMBER, shape); // King: allows additional play
-            case Card.JOKER_NUMBER -> new JokerCard(); // Joker card: punishment: draw JOKER_PUNISHMENT cards
+            case Card.JOKER_NUMBER -> new JokerCard(shape); // Joker card: punishment: draw JOKER_PUNISHMENT cards (shape can be RED, BLACK, or Any)
             default -> new NormalCard(rank, shape); // Normal cards (3-10, excluding 7)
         };
     }

@@ -25,7 +25,6 @@
 
 <template>
     <div class="deck">
-        <div class="deck-label">Deck ({{ deckSize ?? 0 }})</div>
         <div class="deck-cards">
             <!-- Show only a few cards stacked to represent the deck -->
             <Card
