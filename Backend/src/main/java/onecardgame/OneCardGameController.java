@@ -1,7 +1,12 @@
 package onecardgame;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import onecardgame.cards.Card;
@@ -10,7 +15,7 @@ import onecardgame.cards.Card;
 @RequestMapping("/games/onecard")
 public class OneCardGameController {
 
-    private final OneCardGame game = new OneCardGame();
+    private OneCardGame game = new OneCardGame();
 
     public record ActionRequest(@NotBlank String action) {}
     
@@ -29,16 +34,38 @@ public class OneCardGameController {
     public ResponseEntity<GameResponse> setup() {
         GameState gameState = game.getGameState();
         
+        // Check if game is already set up - if so, reset it by creating a new game instance
+        if (gameState.getLastUsedCard() != null || !gameState.getPlayerHand().isEmpty() || !gameState.getAiHand().isEmpty()) {
+            // Game already set up - create a new game instance to reset
+            game = new OneCardGame();
+            gameState = game.getGameState();
+        }
+        
         // Create events for dealer actions (setup sequence)
         java.util.List<GameEvent> events = new java.util.ArrayList<>();
         
-        // Event 1: Cards dealt (happens in GameState constructor - 7 cards to each player)
+        // Event 1: Cards will be dealt in setup()
+        // We'll add this event after setup() is called
+        
+        // Event 2: Initial card placed (happens in setup())
+        try {
+            game.setup();
+        } catch (Exception e) {
+            // If setup fails (e.g., deck empty, null pointer), return error with details
+            e.printStackTrace(); // Log for debugging
+            return ResponseEntity.status(500).body(new GameResponse(
+                null, 
+                false, 
+                "Failed to setup game: " + e.getMessage(), 
+                java.util.Collections.emptyList()
+            ));
+        }
+        
+        // Now get the card counts after setup
         int playerCards = gameState.getPlayerHand().size();
         int aiCards = gameState.getAiHand().size();
         events.add(GameEvent.cardsDealt(playerCards, aiCards));
         
-        // Event 2: Initial card placed (happens in setup())
-        game.setup();
         Card initialCard = gameState.getLastUsedCard();
         if (initialCard != null) {
             events.add(GameEvent.initialCardPlaced(initialCard));
@@ -114,6 +141,7 @@ public class OneCardGameController {
                     : 1; // Default to 1 if can't detect
                 events.add(GameEvent.drewCard("PLAYER", cardsDrawn, game.getGameRule().getAccumulatedDraws()));
                 events.add(GameEvent.turnEnded("PLAYER"));
+                events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
                 // Note: AI turn will be handled by separate endpoint for step-by-step visualization
                 return ResponseEntity.ok(new GameResponse(dto, true, 
                     "Card drawn. Call /ai-turn to see AI's move.", events));
@@ -158,8 +186,10 @@ public class OneCardGameController {
                         }
                     }
                 }
+                events.add(GameEvent.turnEnded("PLAYER"));
+                events.add(GameEvent.turnStarted("AI")); // Signal that AI turn is starting
                 return ResponseEntity.ok(new GameResponse(dto, true, 
-                    "Card played. Press 'End Turn' to complete your turn.", events));
+                    "Card played. Turn ended. Call /ai-turn to see AI's move.", events));
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             GameStateDTO dto = GameStateDTO.fromGameState(
@@ -211,6 +241,16 @@ public class OneCardGameController {
             int accumulatedDrawsBefore = game.getGameRule().getAccumulatedDraws();
             boolean wasUnderAttack = game.getGameRule().wasLastCardAttack();
             
+            // Log AI turn start
+            System.out.println("\n=== AI's Turn ===");
+            if (lastCardBefore != null) {
+                System.out.println("Current card on the table: " + lastCardBefore);
+            }
+            System.out.println("AI has " + aiHandSizeBefore + " cards.");
+            if (accumulatedDrawsBefore > 0) {
+                System.out.println("AI is under attack! Must draw " + accumulatedDrawsBefore + " cards or defend.");
+            }
+            
             // Execute AI turn
             game.getDealer().executeNextTurn(game.getGameState(), game.getGameRule(), null);
             
@@ -222,14 +262,17 @@ public class OneCardGameController {
             
             // Build events list
             java.util.List<GameEvent> events = new java.util.ArrayList<>();
-            events.add(GameEvent.turnStarted("AI"));
+            // Note: TURN_STARTED("AI") was already sent by /play endpoint, so we don't need to send it again
             
-            // Detect what AI did
+            // Detect what AI did and log it
             Card newLastCard = game.getGameState().getLastUsedCard();
             int aiHandSizeAfter = game.getGameState().getAiHand().size();
             
             if (newLastCard != null && !newLastCard.equals(lastCardBefore)) {
-                // AI played a card - check if attack or defense
+                // AI played a card
+                System.out.println("AI played: " + newLastCard);
+                
+                // Check if it's an attack card or defense card
                 if (game.getGameRule().isAttackCard(newLastCard)) {
                     // Check if it was played as defense
                     boolean wasDefense = wasUnderAttack && 
@@ -237,6 +280,7 @@ public class OneCardGameController {
                                        accumulatedDrawsBefore > 0;
                     
                     if (wasDefense) {
+                        System.out.println("AI defended successfully!");
                         // Defense card played - show shield visualization
                         events.add(GameEvent.playedDefenseCard(
                             "AI",
@@ -245,8 +289,9 @@ public class OneCardGameController {
                             game.getGameRule().getAccumulatedDraws()
                         ));
                     } else {
-                        // Attack card played - show arrow/line visualization
                         int punishment = game.getGameRule().getPunishmentValue(newLastCard);
+                        System.out.println("Attack card! Player must draw " + punishment + " cards (Accumulated: " + game.getGameRule().getAccumulatedDraws() + ")");
+                        // Attack card played - show arrow/line visualization
                         events.add(GameEvent.playedAttackCard(
                             "AI",
                             newLastCard, 
@@ -256,13 +301,29 @@ public class OneCardGameController {
                     }
                 } else {
                     // Normal card played
+                    System.out.println("Normal card played.");
                     events.add(GameEvent.playedCard("AI", newLastCard, game.getGameRule().getAccumulatedDraws()));
                 }
+                
+                System.out.println("AI's hand:");
+                for (int i = 0; i < game.getGameState().getAiHand().size(); i++) {
+                    System.out.println((i + 1) + ". " + game.getGameState().getAiHand().get(i));
+                }
+                System.out.println("Player has " + game.getGameState().getPlayerHand().size() + " cards.");
+                System.out.println("Current card on the table: " + newLastCard);
             } else if (aiHandSizeAfter > aiHandSizeBefore) {
                 // AI drew card(s)
                 int cardsDrawn = aiHandSizeAfter - aiHandSizeBefore;
+                System.out.println("AI drew " + cardsDrawn + " card(s).");
+                System.out.println("AI now has " + aiHandSizeAfter + " cards.");
+                System.out.println("Current card on the table: " + (newLastCard != null ? newLastCard : lastCardBefore));
                 events.add(GameEvent.drewCard("AI", cardsDrawn, game.getGameRule().getAccumulatedDraws()));
+            } else {
+                // No change detected (shouldn't happen, but log it)
+                System.out.println("AI's turn completed (no action detected).");
             }
+            
+            System.out.println("=== AI's Turn Ended ===\n");
             
             events.add(GameEvent.turnEnded("AI"));
             events.add(GameEvent.turnStarted("PLAYER"));

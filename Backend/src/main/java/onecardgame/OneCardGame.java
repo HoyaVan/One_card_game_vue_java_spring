@@ -54,7 +54,7 @@ public class OneCardGame {
     /**
      * Processes a player action (card play or draw).
      * - If action is a DRAW ("0"), the turn automatically ends and AI plays.
-     * - If action is a CARD PLAY, the turn does NOT end yet - player must call endTurn().
+     * - If action is a CARD PLAY, the turn automatically ends and AI plays.
      * Returns true if action was valid and executed, false otherwise.
      * 
      * @return true if action was valid, false if game is over
@@ -93,9 +93,6 @@ public class OneCardGame {
             }
         }
         
-        // Check if this is a draw action (drawing automatically ends turn)
-        boolean isDrawAction = normalizedAction.equals("0");
-        
         // Execute player's action
         player.takeTurn(gameState, gameRule, dealer, dealer.isInitialTurn(), normalizedAction);
         
@@ -104,18 +101,15 @@ public class OneCardGame {
             return false;
         }
         
-        // If player drew a card, advance to AI turn (but don't execute AI turn yet)
+        // After any action (draw or play cards), automatically advance to AI turn
         // Vue will call /ai-turn endpoint separately for step-by-step visualization
-        if (isDrawAction) {
-            // Advance to next player (AI)
-            dealer.advanceToNextPlayer();
-            
-            // If game is over after player's turn, return false
-            if (isGameOver()) {
-                return false;
-            }
-            // Note: AI turn will be executed via separate /ai-turn endpoint for visualization
+        dealer.advanceToNextPlayer();
+        
+        // If game is over after player's turn, return false
+        if (isGameOver()) {
+            return false;
         }
+        // Note: AI turn will be executed via separate /ai-turn endpoint for visualization
         
         return !isGameOver();
     }

@@ -17,7 +17,9 @@ public record GameStateDTO(
     boolean isPlayerTurn,
     boolean isGameOver,
     String winner,
-    String message
+    String message,
+    List<Integer> playableCardIndices,  // Indices of playable cards in playerHand
+    List<CardInfo> usedCardPile  // All cards in the used card pile (for stacking visualization)
 ) {
     public record CardInfo(
         int id,
@@ -50,6 +52,13 @@ public record GameStateDTO(
             ? CardInfo.fromCard(gameState.getLastUsedCard(), -1)
             : null;
         
+        // Get all cards from used card pile for stacking visualization
+        List<Card> usedCards = gameRule.getUsedCards();
+        List<CardInfo> usedCardPileInfo = new java.util.ArrayList<>();
+        for (int i = 0; i < usedCards.size(); i++) {
+            usedCardPileInfo.add(CardInfo.fromCard(usedCards.get(i), i));
+        }
+        
         String winner = null;
         if (gameState.isPlayerWinner()) {
             winner = "PLAYER";
@@ -61,17 +70,42 @@ public record GameStateDTO(
             winner = "PLAYER";
         }
         
+        // Calculate playable card indices using backend logic
+        List<Integer> playableIndices = new java.util.ArrayList<>();
+        boolean isPlayerTurn = dealer.getCurrentPlayerIndex() == 0;
+        boolean isInitialTurn = gameState.getLastUsedCard() == null;
+        
+        if (isPlayerTurn && lastCardInfo != null) {
+            Card lastUsedCard = gameState.getLastUsedCard();
+            List<Card> playableCards = gameRule.getPlayableCards(playerHand, lastUsedCard, isInitialTurn);
+            
+            // Convert playable cards to their indices in the player hand
+            for (Card playableCard : playableCards) {
+                int index = playerHand.indexOf(playableCard);
+                if (index >= 0) {
+                    playableIndices.add(index);
+                }
+            }
+        } else if (isPlayerTurn && isInitialTurn) {
+            // If it's the initial turn, all cards are playable
+            for (int i = 0; i < playerHand.size(); i++) {
+                playableIndices.add(i);
+            }
+        }
+        
         return new GameStateDTO(
             playerHandInfo,
             gameState.getAiHand().size(),
             lastCardInfo,
             gameState.getDeckSize(),
             gameRule.getAccumulatedDraws(),
-            dealer.getCurrentPlayerIndex() == 0,
+            isPlayerTurn,
             gameState.isAIWinner() || gameState.isPlayerWinner() || 
             gameState.isAILoser() || gameState.isPlayerLoser(),
             winner,
-            ""
+            "",
+            playableIndices,
+            usedCardPileInfo
         );
     }
 }
