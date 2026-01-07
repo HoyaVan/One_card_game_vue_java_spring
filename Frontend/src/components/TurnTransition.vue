@@ -4,6 +4,8 @@ import { ref, watch, onMounted } from 'vue'
 const props = defineProps<{
     show: boolean
     playerName: string  // "PLAYER" or "AI"
+    isBattleSituation?: boolean  // Whether AI is drawing cards during battle (under attack)
+    cardsToDraw?: number  // Number of cards AI must draw during battle
 }>()
 
 const emit = defineEmits<{
@@ -71,10 +73,24 @@ onMounted(() => {
 <template>
     <Transition name="turn-transition">
         <div v-if="show" class="turn-overlay">
-            <div class="turn-content">
-                <div class="turn-icon">🎮</div>
-                <h2 class="turn-text">{{ playerName === 'PLAYER' ? "Your Turn!" : "AI's Turn" }}</h2>
-                <div class="turn-subtitle">{{ playerName === 'PLAYER' ? "Make your move" : "Thinking..." }}</div>
+            <div class="turn-content" :class="{ 'battle-situation': isBattleSituation }">
+                <div class="turn-icon">{{ isBattleSituation ? '⚔️' : '🎮' }}</div>
+                <h2 class="turn-text">
+                    <template v-if="isBattleSituation && playerName === 'AI'">
+                        AI Under Attack!
+                    </template>
+                    <template v-else>
+                        {{ playerName === 'PLAYER' ? "Your Turn!" : "AI's Turn" }}
+                    </template>
+                </h2>
+                <div class="turn-subtitle">
+                    <template v-if="isBattleSituation && playerName === 'AI'">
+                        AI must draw {{ cardsToDraw || 0 }} card(s) or defend!
+                    </template>
+                    <template v-else>
+                        {{ playerName === 'PLAYER' ? "Make your move" : "Thinking..." }}
+                    </template>
+                </div>
             </div>
             
             <!-- Sound effect -->
@@ -107,6 +123,10 @@ onMounted(() => {
     animation: pulse-glow 2s ease-in-out;
 }
 
+.turn-content.battle-situation {
+    animation: battle-pulse-glow 2s ease-in-out;
+}
+
 .turn-icon {
     font-size: 80px;
     margin-bottom: 20px;
@@ -136,6 +156,17 @@ onMounted(() => {
     50% {
         transform: scale(1.05);
         filter: drop-shadow(0 0 30px rgba(255, 255, 255, 0.8));
+    }
+}
+
+@keyframes battle-pulse-glow {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.6));
+    }
+    50% {
+        transform: scale(1.05);
+        filter: drop-shadow(0 0 35px rgba(239, 68, 68, 0.9));
     }
 }
 

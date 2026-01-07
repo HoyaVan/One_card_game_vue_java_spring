@@ -78,3 +78,6 @@ JavaOrigin/output/
 
 ### Root level build artifacts ###
 target/
+
+### Markdown files ###
+*.md

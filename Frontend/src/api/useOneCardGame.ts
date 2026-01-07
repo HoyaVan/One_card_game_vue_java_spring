@@ -65,7 +65,20 @@ export function useOneCardGame() {
                 body: JSON.stringify({ action })
             })
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+                // Try to get error message from response body
+                let errorMessage = `HTTP error! status: ${response.status}`
+                try {
+                    const errorData = await response.json()
+                    if (errorData.message) {
+                        errorMessage = errorData.message
+                    }
+                } catch (e) {
+                    // If response is not JSON, use default message
+                }
+                error.value = errorMessage
+                console.error('Error playing action:', errorMessage)
+                // Don't update game state on error - return null
+                return null
             }
             const data: GameResponse = await response.json()
             gameState.value = data.gameState
@@ -74,6 +87,7 @@ export function useOneCardGame() {
         } catch (err) {
             error.value = err instanceof Error ? err.message : 'Failed to play action'
             console.error('Error playing action:', err)
+            // Don't update game state on error - return null
             return null
         } finally {
             loading.value = false

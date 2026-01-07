@@ -1,7 +1,5 @@
 package onecardgame;
 
-import java.util.List;
-
 import onecardgame.cards.Card;
 import onecardgame.cards.FaceCard;
 
@@ -17,20 +15,25 @@ public class OneCardGame {
 
         this.gameRule = new PlayRule();
         this.gameState = new GameState();
-        this.player = new Player(null); 
+        this.player = new Player(null);
         this.ai = new AIPlayer();
         this.dealer = new Dealer(player, ai);
     }
 
     public void setup() {
-        // Step 1: Draw first card BEFORE dealing hands (this becomes the first used card)
+        // Step 1: Draw first card BEFORE dealing hands (this becomes the first used
+        // card)
         Card initialCard = gameState.drawFromDeck(); // Uses legacy method - deck is full, no reshuffle needed
         gameRule.setInitialCard(initialCard, gameState);
-        
+
         // Step 2: Deal initial hands to players from remaining deck
         gameState.dealInitialCards();
-        
-        // First player must match the initial card, so isInitialTurn remains false
+
+        // First player must match the initial card
+        // Set isInitialTurn to true so the first player can play any card that matches
+        // (isCardPlayable will still enforce matching rules, but isInitialTurn=true
+        // allows any matching card)
+        dealer.setInitialTurn(true);
     }
 
     public boolean isGameOver() {
@@ -39,17 +42,17 @@ public class OneCardGame {
             return false;
         }
         return gameState.isAIWinner() || gameState.isPlayerWinner()
-            || gameState.isAILoser()  || gameState.isPlayerLoser();
+                || gameState.isAILoser() || gameState.isPlayerLoser();
     }
-    
+
     public GameState getGameState() {
         return gameState;
     }
-    
+
     public PlayRule getGameRule() {
         return gameRule;
     }
-    
+
     public Dealer getDealer() {
         return dealer;
     }
@@ -67,17 +70,18 @@ public class OneCardGame {
         if (gameState.getLastUsedCard() == null) {
             return false;
         }
-        
+
         if (isGameOver()) {
             return false;
         }
-        
+
         // Only process if it's player's turn (index 0)
         if (dealer.getCurrentPlayerIndex() != 0) {
             throw new IllegalStateException("Not player's turn");
         }
-        
-        // Normalize action: treat null, empty string, or strings that parse to 0 as draw action ("0")
+
+        // Normalize action: treat null, empty string, or strings that parse to 0 as
+        // draw action ("0")
         String normalizedAction;
         if (action == null || action.trim().isEmpty()) {
             normalizedAction = "0";
@@ -95,66 +99,65 @@ public class OneCardGame {
                 normalizedAction = trimmed;
             }
         }
-        
+
         // Store last card before action to detect if face card was just played
         Card lastCardBefore = gameState.getLastUsedCard();
-        
+
+        // Store isInitialTurn before action (needed for first card play)
+        boolean wasInitialTurn = dealer.isInitialTurn();
+
         // Execute player's action
         player.takeTurn(gameState, gameRule, dealer, dealer.isInitialTurn(), normalizedAction);
-        
+
+        // After first card is played, isInitialTurn should be set to false
+        if (wasInitialTurn) {
+            dealer.setInitialTurn(false);
+        }
+
         // If game ended immediately after player action, return false
         if (isGameOver()) {
             return false;
         }
-        
-        // Check if a face card was just played (last card changed and is now a face card)
-        // and player has no playable cards - must draw automatically but keep turn
+
+        // Check if a face card was just played (last card changed and is now a face
+        // card)
+        // When a face card is played (alone or as last card in multiple cards), player
+        // gets one more turn
+        // BUT: Face card effect does NOT apply if it's the initial card
         Card lastCardAfter = gameState.getLastUsedCard();
         boolean shouldKeepTurn = false;
-        if (lastCardAfter != null && lastCardAfter != lastCardBefore && 
-            lastCardAfter instanceof FaceCard) {
-            // Face card was just played - check if player has any playable cards
-            List<Card> playableCards = gameRule.getPlayableCards(
-                gameState.getPlayerHand(), 
-                lastCardAfter, 
-                false // Not initial turn anymore
-            );
-            
-            // If no playable cards, automatically draw a card but keep player's turn
-            if (playableCards.isEmpty()) {
-                // Player must draw a card after face card if no playable cards
-                // But they get one more turn (no transition to AI)
-                player.takeTurn(gameState, gameRule, dealer, false, "0");
-                
-                // Check if game ended after drawing
-                if (isGameOver()) {
-                    return false;
-                }
-                
-                // Keep player's turn - don't advance to AI
-                shouldKeepTurn = true;
-            }
+
+        // Check if a card was played (last card changed)
+        if (lastCardAfter != null && lastCardAfter != lastCardBefore &&
+                lastCardAfter instanceof FaceCard) {
+            // Face card was played (alone or as last card in multiple cards) - player gets
+            // one more turn
+            // They can choose to play another card or end their turn
+            shouldKeepTurn = true;
+            // If it's the initial card, don't keep turn (normal turn flow)
         }
-        
+
         // After any action (draw or play cards), automatically advance to AI turn
         // UNLESS face card was played and player had to draw (then keep player's turn)
         if (!shouldKeepTurn) {
             // Vue will call /ai-turn endpoint separately for step-by-step visualization
             dealer.advanceToNextPlayer();
         }
-        
+
         // If game is over after player's turn, return false
         if (isGameOver()) {
             return false;
         }
-        // Note: AI turn will be executed via separate /ai-turn endpoint for visualization
-        
+        // Note: AI turn will be executed via separate /ai-turn endpoint for
+        // visualization
+
         return !isGameOver();
     }
-    
+
     /**
      * Ends the current player's turn and executes AI turn if game continues.
-     * This should be called after processPlayerAction() when player presses "End Turn" button.
+     * This should be called after processPlayerAction() when player presses "End
+     * Turn" button.
      * Returns true if game continues, false if game is over.
      */
     public boolean endTurn() {
@@ -162,30 +165,31 @@ public class OneCardGame {
         if (gameState.getLastUsedCard() == null) {
             throw new IllegalStateException("Cannot end turn - game not set up");
         }
-        
+
         if (isGameOver()) {
             return false;
         }
-        
+
         // Only allow ending turn if it's currently player's turn
         if (dealer.getCurrentPlayerIndex() != 0) {
             throw new IllegalStateException("Cannot end turn - not player's turn");
         }
-        
+
         // Advance to next player (AI)
         dealer.advanceToNextPlayer();
-        
+
         // If game is over after player's turn, return false
         if (isGameOver()) {
             return false;
         }
-        
-        // Note: AI turn will be executed via separate /ai-turn endpoint for step-by-step visualization
+
+        // Note: AI turn will be executed via separate /ai-turn endpoint for
+        // step-by-step visualization
         // This allows Vue to animate: "Player turn ended" → "AI thinking" → "AI action"
-        
+
         return !isGameOver();
     }
-    
+
     /**
      * Executes one step of the game (for turn-based gameplay).
      * Used by REST API for step-by-step game progression.
@@ -194,13 +198,13 @@ public class OneCardGame {
         if (isGameOver()) {
             return false;
         }
-        
+
         // If it's player's turn, wait for action from REST API
         // This method is mainly for AI turns
         if (dealer.getCurrentPlayerIndex() == 1) {
             dealer.executeNextTurn(gameState, gameRule, null);
         }
-        
+
         return !isGameOver();
     }
 }

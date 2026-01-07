@@ -22,7 +22,7 @@ public class PlayRule {
         this.usedCardPile = new UsedCardPile();
         this.accumulatedDraws = RESET_ACCUMULATED_DRAWS; // Initialize accumulated draws
     }
-    
+
     /**
      * Gets all cards from used pile except the last one (for reshuffling).
      * The last card must remain as the lastUsedCard.
@@ -37,7 +37,7 @@ public class PlayRule {
         // Return all cards except the last one
         return new java.util.ArrayList<>(allCards.subList(0, allCards.size() - 1));
     }
-    
+
     /**
      * Removes all cards from used pile except the last one.
      * Used after reshuffling to keep only the lastUsedCard in the pile.
@@ -53,7 +53,7 @@ public class PlayRule {
     public int getAccumulatedDraws() {
         return accumulatedDraws;
     }
-    
+
     /**
      * Resets accumulated draws to 0. Should be called after a player draws cards.
      */
@@ -65,10 +65,10 @@ public class PlayRule {
      * Sets the initial card on the table at the start of the game.
      * 
      * @param initialCard The card to set as the initial card
-     * @param gameState The game state to update
+     * @param gameState   The game state to update
      */
-    public void setInitialCard(final Card initialCard, 
-                            final GameState gameState) {
+    public void setInitialCard(final Card initialCard,
+            final GameState gameState) {
         if (initialCard != null) {
             usedCardPile.addCard(initialCard);
             gameState.setInitialCard(initialCard);
@@ -76,36 +76,41 @@ public class PlayRule {
     }
 
     // Add the playCard method to handle playing a card
-    public void playCard(final Card card, final boolean isInitialTurn)
-    {
+    public void playCard(final Card card, final boolean isInitialTurn) {
         GameValidator.validateCardNotNull(card);
-        
+
         final Card lastUsedCard;
         final boolean isDefenseMode;
-        
+
         lastUsedCard = usedCardPile.getLastCard();
-        isDefenseMode = isAttackCardPrivate(lastUsedCard);
-        
+        // Defense mode: last card is attack card AND there are accumulated draws
+        // (active attack)
+        // This prevents ping-pong scenarios where defense resets draws but next attack
+        // accumulates incorrectly
+        isDefenseMode = isAttackCardPrivate(lastUsedCard) && accumulatedDraws > MIN_INDEX;
+
         usedCardPile.addCard(card); // Add the card to the used cards pile
 
         if (!isInitialTurn) {
-            // Check if this is a defense (attack card played after another attack card)
+            // Check if this is a defense (attack card played after another attack card
+            // while under attack)
             if (isDefenseMode && isDefenseCardPrivate(card, lastUsedCard)) {
-                // Defense successful - reset accumulated draws
-                accumulatedDraws = RESET_ACCUMULATED_DRAWS;
-                // Only display "Defended!" message (removed card + DEFEND_LABEL for cleaner output)
+                // Defense successful - reset accumulated draws is NOT needed if we want
+                // stacking,
+                // but for now we just acknowledge the defense.
+                // The next block will handle adding the new card's punishment.
                 GameMessages.display(GameMessages.DEFENDED);
-            } else if (card instanceof Attackable attackable) {
-                // Attack mode - accumulate draws (played after normal card or after opponent drew)
-                int punishment = attackable.getPunishment();
-                accumulatedDraws += punishment; // Track accumulated draws locally
-                // GameMessages.display(card + ATTACK_LABEL); // Removed: don't show "(Attack)" label
-                // GameMessages.displayFormatted(GameMessages.ACCUMULATED_DRAWS_INCREASED, punishment); // Commented out debug
             }
-            // Week 2: Inheritance, Polymorphism - demonstrated through toString() and interface methods
+
+            if (card instanceof Attackable attackable) {
+                // Attack mode - accumulate draws.
+                // This applies to both direct attacks and defensive counter-attacks.
+                int punishment = attackable.getPunishment();
+                accumulatedDraws += punishment;
+            }
         }
     }
-    
+
     /**
      * Public method to check if a card is an attack card.
      * Used by controllers to determine event types for visualization.
@@ -113,11 +118,11 @@ public class PlayRule {
     public boolean isAttackCard(final Card card) {
         return card instanceof Attackable;
     }
-    
+
     private boolean isAttackCardPrivate(final Card card) {
         return isAttackCard(card);
     }
-    
+
     /**
      * Public method to check if the last played card was an attack card.
      * Used to determine if the next card played will be a defense.
@@ -126,9 +131,10 @@ public class PlayRule {
         Card lastCard = getLastUsedCard();
         return lastCard != null && isAttackCard(lastCard) && accumulatedDraws > 0;
     }
-    
+
     /**
-     * Public method to check if a card played would be a defense against the last card.
+     * Public method to check if a card played would be a defense against the last
+     * card.
      * Used by controllers to determine event types for visualization.
      */
     public boolean isDefenseCard(final Card card, final Card lastUsedCard) {
@@ -137,19 +143,52 @@ public class PlayRule {
         }
         return isDefenseCardPrivate(card, lastUsedCard);
     }
-    
+
     private boolean isDefenseCardPrivate(final Card card, final Card lastUsedCard) {
-        if (card instanceof AceCard && lastUsedCard instanceof AceCard) {
-            return card.getShape().equals(lastUsedCard.getShape());
+        // Both cards must be Attackable
+        if (!(card instanceof Attackable defendingCard) || !(lastUsedCard instanceof Attackable attackingCard)) {
+            return false;
         }
-        if (card instanceof JokerCard) {
-            return true; // Joker can defend against any attack (including another Joker)
+
+        // Check punishment hierarchy: defending card must have >= punishment value
+        // Hierarchy: 2 (punishment 2) < Ace (punishment 3) < Joker (punishment 5)
+        // Same value cards can defend against each other (e.g., Ace vs Ace, 2 vs 2,
+        // Joker vs Joker)
+        final int attackingPunishment = attackingCard.getPunishment();
+        final int defendingPunishment = defendingCard.getPunishment();
+
+        // Defending card must have equal or higher punishment value
+        if (defendingPunishment < attackingPunishment) {
+            return false; // Lower value card cannot defend against higher value attack
         }
+
+        // Now check specific card type rules (only if punishment is sufficient)
+        // NumTwoCard defending: same rank AND same shape required (punishment 2)
+        // Can defend against NumTwoCard (same value) with same rank and shape
         if (card instanceof NumTwoCard && lastUsedCard instanceof NumTwoCard) {
-            // NumTwoCard defense requires both same rank AND same shape
-            return card.getRank() == lastUsedCard.getRank() && 
-                   card.getShape().equals(lastUsedCard.getShape());
+            return card.getRank() == lastUsedCard.getRank() &&
+                    card.getShape().equals(lastUsedCard.getShape());
         }
+
+        // AceCard defending: same shape required (punishment 3)
+        // Can defend against NumTwoCard (if same shape) or AceCard (same value, if same
+        // shape)
+        if (card instanceof AceCard) {
+            // Ace can defend against NumTwo (if same shape) or Ace (same value, if same
+            // shape)
+            if (lastUsedCard instanceof NumTwoCard || lastUsedCard instanceof AceCard) {
+                return card.getShape().equals(lastUsedCard.getShape());
+            }
+            // Ace cannot defend against Joker (punishment 3 < 5)
+            return false;
+        }
+
+        // JokerCard: can defend against anything (punishment 5 >= any other)
+        // Can defend against 2, Ace, or Joker (same value)
+        if (card instanceof JokerCard) {
+            return true; // Joker can defend against any attack (2, Ace, or Joker)
+        }
+
         return false;
     }
 
@@ -161,15 +200,16 @@ public class PlayRule {
 
         cardToPlay = hand.get(index); // Get the card without removing it
         hand.remove(index); // Remove the card from hand
-        
+
         playCard(cardToPlay, false); // Play the card (isInitialTurn is false since validation already happened)
     }
-    
+
     /**
-     * Plays a NumSevenCard with a new shape. Used when the shape-change effect is applied.
+     * Plays a NumSevenCard with a new shape. Used when the shape-change effect is
+     * applied.
      * 
-     * @param numSevenCard The NumSevenCard to play
-     * @param newShape The new shape to apply
+     * @param numSevenCard  The NumSevenCard to play
+     * @param newShape      The new shape to apply
      * @param isInitialTurn Whether this is the initial turn
      */
     public void playNumSevenCard(final NumSevenCard numSevenCard, final String newShape, final boolean isInitialTurn) {
@@ -187,7 +227,8 @@ public class PlayRule {
     }
 
     // Week 3: Final Method
-    // Checks if two cards match (same number OR same shape, or if either is a Joker)
+    // Checks if two cards match (same number OR same shape, or if either is a
+    // Joker)
     // Ace cards match each other regardless of shape
     public final boolean matches(final Card card1, final Card card2) {
         if (card1 == null || card2 == null) {
@@ -211,59 +252,98 @@ public class PlayRule {
         return false;
     }
 
-    public boolean isCardPlayable(final Card cardToPlay, 
-                                 final Card lastUsedCard, 
-                                 final boolean isInitialTurn) throws InvalidMoveException
-    {
-        // GameMessages.displayFormatted(GameMessages.CHECKING_CARD_PLAYABLE, cardToPlay, lastUsedCard);
+    public boolean isCardPlayable(final Card cardToPlay,
+            final Card lastUsedCard,
+            final boolean isInitialTurn) throws InvalidMoveException {
+        // GameMessages.displayFormatted(GameMessages.CHECKING_CARD_PLAYABLE,
+        // cardToPlay, lastUsedCard);
         // GameMessages.displayFormatted(GameMessages.IS_INITIAL_TURN, isInitialTurn);
-        if (lastUsedCard == null || isInitialTurn) {
+        if (lastUsedCard == null) {
             // GameMessages.display(GameMessages.ANY_CARD_PLAYABLE);
             return true; // Any card is playable if no card is on the table
         }
 
-        // Joker on table: any card can be played (matching rules don't apply)
-        if (lastUsedCard instanceof JokerCard) {
-            return true; // Any card is playable on a Joker
+        // On initial turn, card must match the initial card by shape or rank
+        if (isInitialTurn) {
+            return matches(cardToPlay, lastUsedCard);
         }
 
-        // Only require defense if we're currently under attack (accumulatedDraws > 0)
-        // After drawing accumulated cards, accumulatedDraws is reset to 0, so normal matching cards are allowed
+        // NOTE: Face card effect is NOT handled here in isCardPlayable()
+        // The face card "one more turn" effect is handled differently:
+        // - When PLAYER plays a face card: Their turn is kept
+        // (OneCardGame.processPlayerAction)
+        // and they can play any card during that extra turn (handled by
+        // frontend/backend turn management)
+        // - When AI plays a face card: handleFaceCardEffect() immediately plays another
+        // card
+        // during AI's turn, so by the time it's player's turn, the face card is just a
+        // normal card
+        // - The face card effect ONLY benefits the player who played it, NOT the
+        // opponent
+        // - Therefore, we do NOT allow any card to be played just because a face card
+        // is on the table
+        // The opponent must follow normal matching rules
+
+        // IMPORTANT: Check defense rules FIRST if under attack (accumulatedDraws > 0)
+        // This must come BEFORE the Joker check, because when under attack by a Joker,
+        // only valid defense cards (Joker or higher) can be played, not ANY card
+        // After drawing accumulated cards, accumulatedDraws is reset to 0, so normal
+        // matching cards are allowed
         if (lastUsedCard instanceof Attackable attackingCard && accumulatedDraws > MIN_INDEX) {
-            // Defense card must be Attackable and have punishment >= attacking card's punishment
+            // Defense card must be Attackable and have punishment >= attacking card's
+            // punishment
             if (!(cardToPlay instanceof Attackable defendingCard)) {
                 throw new InvalidMoveException(GameMessages.INVALID_MOVE_CANNOT_PROTECT);
             }
-            
+
             final int attackingPunishment = attackingCard.getPunishment();
             final int defendingPunishment = defendingCard.getPunishment();
-            
-            // Check punishment value: defending card must have >= punishment value
+
+            // Check punishment hierarchy: defending card must have >= punishment value
+            // Hierarchy: 2 (punishment 2) < Ace (punishment 3) < Joker (punishment 5)
             if (defendingPunishment < attackingPunishment) {
                 throw new InvalidMoveException(GameMessages.INVALID_MOVE_CANNOT_PROTECT);
             }
-            
-            // NumTwoCard defending: same rank required (punishment 2)
-            if (cardToPlay instanceof NumTwoCard && 
-                cardToPlay.getRank() == lastUsedCard.getRank()) {
-                // GameMessages.display(GameMessages.ATTACK_CARD_BLOCKS);
-                return true; // NumTwo blocks the same-number attack card (punishment >= required)
+
+            // Now check specific card type rules (only if punishment is sufficient)
+            // NumTwoCard defending: same rank AND same shape required (punishment 2)
+            if (cardToPlay instanceof NumTwoCard &&
+                    lastUsedCard instanceof NumTwoCard &&
+                    cardToPlay.getRank() == lastUsedCard.getRank() &&
+                    cardToPlay.getShape().equals(lastUsedCard.getShape())) {
+                return true; // NumTwo blocks the same-number AND same-shape attack card (punishment >=
+                             // required)
             }
-            // AceCard defending: same shape required (punishment 3, can defend against NumTwoCard or AceCard)
-            if (cardToPlay instanceof AceCard && 
-                cardToPlay.getShape().equals(lastUsedCard.getShape())) {
-                // GameMessages.display(GameMessages.ACE_BLOCKS_ACE);
-                return true; // Ace blocks with same shape (punishment 3 >= 2 or 3)
+
+            // AceCard defending: same shape required (punishment 3, can defend against
+            // NumTwoCard or AceCard)
+            if (cardToPlay instanceof AceCard) {
+                // Ace can defend against NumTwo (if same shape) or Ace (if same shape)
+                // But NOT Joker (punishment check above already prevents this)
+                if (lastUsedCard instanceof NumTwoCard || lastUsedCard instanceof AceCard) {
+                    return cardToPlay.getShape().equals(lastUsedCard.getShape());
+                }
+                // If lastUsedCard is Joker, punishment check above should have failed, but be
+                // explicit
+                throw new InvalidMoveException(GameMessages.INVALID_MOVE_CANNOT_PROTECT);
             }
-            // JokerCard: always works (punishment 5, can defend against anything)
+
+            // JokerCard: can defend against anything (punishment 5 >= any other)
             if (cardToPlay instanceof JokerCard) {
-                // GameMessages.display(GameMessages.JOKER_BLOCKS_ATTACK);
-                return true; // Joker blocks any attack (punishment 5 >= any other)
+                return true; // Joker blocks any attack (2, Ace, or Joker)
             }
-            // GameMessages.display(GameMessages.DEBUG_CARD_CANNOT_PROTECT);
-            // GameMessages.display(GameMessages.DEFEND_FAILED);
+
+            // If we get here, the card type doesn't match any defense rules
             throw new InvalidMoveException(GameMessages.INVALID_MOVE_CANNOT_PROTECT);
         }
+
+        // Joker on table:
+        // If under attack (accumulatedDraws > 0), defense rules above would have been
+        // checked and returned/throw.
+        // If NOT under attack (accumulatedDraws == 0), the Joker acts as a wild card
+        // (matches everything).
+        // Therefore, we do NOT restrict plays to only JokerCards here.
+        // The matches() method below handles the "Joker matches anything" logic.
 
         if (matches(cardToPlay, lastUsedCard)) {
             // GameMessages.display(GameMessages.NORMAL_MOVE_VALID);
@@ -275,32 +355,32 @@ public class PlayRule {
     }
 
     // Find a playable card from the given hand
-    public Card findPlayableCard(final List<Card> hand, 
-                                final Card lastUsedCard, 
-                                final boolean isInitialTurn) {
-        return findPlayableCard(hand, 
-                                lastUsedCard, 
-                                isInitialTurn, 
-                                Card.class);
+    public Card findPlayableCard(final List<Card> hand,
+            final Card lastUsedCard,
+            final boolean isInitialTurn) {
+        return findPlayableCard(hand,
+                lastUsedCard,
+                isInitialTurn,
+                Card.class);
     }
 
     // Week 6: Generics Methods
     // Find a playable card of a specific type from the given hand
-    public <T extends Card> T findPlayableCard(final List<Card> hand, 
-                                               final Card lastUsedCard, 
-                                               final boolean isInitialTurn, 
-                                               final Class<T> cardType) {
+    public <T extends Card> T findPlayableCard(final List<Card> hand,
+            final Card lastUsedCard,
+            final boolean isInitialTurn,
+            final Class<T> cardType) {
         return hand.stream()
                 .filter(cardType::isInstance)
                 .map(cardType::cast)
-                .filter(card ->
-                {
+                .filter(card -> {
                     try {
-                        return isCardPlayable(card, 
-                                             lastUsedCard, 
-                                             isInitialTurn);
+                        return isCardPlayable(card,
+                                lastUsedCard,
+                                isInitialTurn);
                     } catch (InvalidMoveException e) {
-                        // GameMessages.displayFormatted(GameMessages.SKIPPING_CARD, card, e.getMessage());
+                        // GameMessages.displayFormatted(GameMessages.SKIPPING_CARD, card,
+                        // e.getMessage());
                         return false; // Ignore invalid moves during this check
                     }
                 })
@@ -310,21 +390,21 @@ public class PlayRule {
 
     // Week 7: Functional Interfaces, Lambdas, Method References
     // Add to the list if the card is playable, return the list of playable cards
-    public List<Card> getPlayableCards(final List<Card> hand, 
-                                      final Card lastUsedCard, 
-                                      final boolean isInitialTurn) {
-        return getPlayableCards(hand, 
-                                lastUsedCard, 
-                                isInitialTurn, 
-                                Card.class);
+    public List<Card> getPlayableCards(final List<Card> hand,
+            final Card lastUsedCard,
+            final boolean isInitialTurn) {
+        return getPlayableCards(hand,
+                lastUsedCard,
+                isInitialTurn,
+                Card.class);
     }
 
     // Week 6: Generics Methods
     // Get all playable cards of a specific type from the given hand
-    public <T extends Card> List<T> getPlayableCards(final List<Card> hand, 
-                                                    final Card lastUsedCard, 
-                                                    final boolean isInitialTurn, 
-                                                    final Class<T> cardType) {
+    public <T extends Card> List<T> getPlayableCards(final List<Card> hand,
+            final Card lastUsedCard,
+            final boolean isInitialTurn,
+            final Class<T> cardType) {
         GameValidator.validateCardNotNull(lastUsedCard);
 
         return hand.stream()
@@ -332,9 +412,9 @@ public class PlayRule {
                 .map(cardType::cast)
                 .filter(card -> {
                     try {
-                        return isCardPlayable(card, 
-                                             lastUsedCard, 
-                                             isInitialTurn);
+                        return isCardPlayable(card,
+                                lastUsedCard,
+                                isInitialTurn);
                     } catch (InvalidMoveException e) {
                         return false; // Ignore invalid cards
                     }
@@ -342,9 +422,8 @@ public class PlayRule {
                 .toList();
     }
 
-
-    public void playCardWithoutEffect(final Card card, 
-                                    final GameState gameState) {
+    public void playCardWithoutEffect(final Card card,
+            final GameState gameState) {
         GameValidator.validateCardNotNull(card);
 
         usedCardPile.addCard(card); // Add the card to the used card pile

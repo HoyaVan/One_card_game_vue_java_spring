@@ -8,13 +8,14 @@ globalThis.fetch = vi.fn() as any
 describe('useOneCardGame composable', () => {
   const mockGameState: GameState = {
     playerHand: [
-      { id: 1, index: 0, rank: 'A', shape: 'Hearts' }
+      { id: 1, index: 0, rank: 'A', shape: 'Hearts', isInitialCard: false }
     ],
     aiHandSize: 5,
-    lastUsedCard: { id: 2, index: 0, rank: 'K', shape: 'Diamonds' },
+    lastUsedCard: { id: 2, index: 0, rank: 'K', shape: 'Diamonds', isInitialCard: false },
     deckSize: 30,
     accumulatedDraws: 0,
     isPlayerTurn: true,
+    isInitialTurn: false,
     isGameOver: false,
     winner: null,
     message: '',

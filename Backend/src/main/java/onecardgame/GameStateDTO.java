@@ -15,6 +15,7 @@ public record GameStateDTO(
     int deckSize,
     int accumulatedDraws,
     boolean isPlayerTurn,
+    boolean isInitialTurn,  // Whether this is the initial turn (attack rules don't apply)
     boolean isGameOver,
     String winner,
     String message,
@@ -25,7 +26,8 @@ public record GameStateDTO(
         int id,
         int index,
         String rank,
-        String shape
+        String shape,
+        boolean isInitialCard  // Whether this card is the initial card (should be treated as normal card)
     ) {
         /**
          * Converts card rank number to string format matching frontend image file names.
@@ -47,7 +49,7 @@ public record GameStateDTO(
             };
         }
         
-        public static CardInfo fromCard(Card card, int index) {
+        public static CardInfo fromCard(Card card, int index, boolean isInitialCard) {
             // Generate unique ID: combination of index, rank, and shape
             // This ensures uniqueness even if multiple cards have same rank/shape
             // Using hash of rank + shape to create stable ID
@@ -56,8 +58,14 @@ public record GameStateDTO(
                 id,
                 index,
                 rankToString(card.getRank()),
-                card.getShape()
+                card.getShape(),
+                isInitialCard
             );
+        }
+        
+        // Overloaded method for backward compatibility (defaults to false)
+        public static CardInfo fromCard(Card card, int index) {
+            return fromCard(card, index, false);
         }
     }
     
@@ -68,16 +76,24 @@ public record GameStateDTO(
             playerHandInfo.add(CardInfo.fromCard(playerHand.get(i), i));
         }
         
-        CardInfo lastCardInfo = gameState.getLastUsedCard() != null 
-            ? CardInfo.fromCard(gameState.getLastUsedCard(), -1)
-            : null;
-        
         // Get all cards from used card pile for stacking visualization
+        // The first card (index 0) is always the initial card
         List<Card> usedCards = gameRule.getUsedCards();
         List<CardInfo> usedCardPileInfo = new java.util.ArrayList<>();
         for (int i = 0; i < usedCards.size(); i++) {
-            usedCardPileInfo.add(CardInfo.fromCard(usedCards.get(i), i));
+            boolean isInitialCard = (i == 0); // First card in pile is always the initial card
+            usedCardPileInfo.add(CardInfo.fromCard(usedCards.get(i), i, isInitialCard));
         }
+        
+        // Determine if lastUsedCard is the initial card
+        // The initial card is the first card in the used card pile (index 0)
+        // If there's only one card in the pile, the lastUsedCard IS the initial card
+        Card lastCard = gameState.getLastUsedCard();
+        boolean isLastCardInitial = (lastCard != null && usedCards.size() == 1);
+        
+        CardInfo lastCardInfo = lastCard != null 
+            ? CardInfo.fromCard(lastCard, -1, isLastCardInitial)
+            : null;
         
         String winner = null;
         if (gameState.isPlayerWinner()) {
@@ -93,7 +109,7 @@ public record GameStateDTO(
         // Calculate playable card indices using backend logic
         List<Integer> playableIndices = new java.util.ArrayList<>();
         boolean isPlayerTurn = dealer.getCurrentPlayerIndex() == 0;
-        boolean isInitialTurn = gameState.getLastUsedCard() == null;
+        boolean isInitialTurn = dealer.isInitialTurn(); // Use dealer's isInitialTurn flag
         
         if (isPlayerTurn && lastCardInfo != null) {
             Card lastUsedCard = gameState.getLastUsedCard();
@@ -120,6 +136,7 @@ public record GameStateDTO(
             gameState.getDeckSize(),
             gameRule.getAccumulatedDraws(),
             isPlayerTurn,
+            isInitialTurn,
             gameState.isAIWinner() || gameState.isPlayerWinner() || 
             gameState.isAILoser() || gameState.isPlayerLoser(),
             winner,

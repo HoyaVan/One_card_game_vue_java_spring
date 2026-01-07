@@ -5,6 +5,7 @@
         card?: CardInfo,
         isSelected?: boolean,
         isPlayable?: boolean,
+        isDefenseCard?: boolean,  // Whether this card can defend against an attack
         showBack?: boolean  // Show card back (face down) instead of front
     }>() // Receive data from parent
 
@@ -49,6 +50,7 @@
         :class="{ 
             selected: isSelected,
             playable: isPlayable && !isSelected && !showBack,
+            'defense-card': isDefenseCard && !isSelected && !showBack,
             'non-playable': !isPlayable && !showBack && card,
             'card-back': showBack
         }" 
@@ -104,10 +106,34 @@
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
 }
 
+/* Defense card styling - special styling when under attack */
+.defense-card {
+  outline: 3px solid #f59e0b;
+  outline-offset: -3px;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  animation: defense-pulse 2s infinite;
+}
+
+@keyframes defense-pulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+  }
+}
+
 /* When card is both playable and selected, only show selected styling */
 .selected.playable {
   outline: none;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* When card is both defense and selected, show selected styling */
+.selected.defense-card {
+  outline: none;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  animation: none;
 }
 
 .card-back {

@@ -7,6 +7,7 @@ export interface GameState {
     deckSize: number
     accumulatedDraws: number
     isPlayerTurn: boolean
+    isInitialTurn: boolean  // Whether this is the initial turn (attack rules don't apply)
     isGameOver: boolean
     winner: string | null
     message: string

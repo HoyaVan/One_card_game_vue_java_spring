@@ -25,12 +25,13 @@ vi.mock('../../api/useOneCardGame', () => ({
 
 describe('GameBoard.vue', () => {
   const mockGameStateData: GameState = {
+    isInitialTurn: false,
     playerHand: [
-      { id: 1, index: 0, rank: 'A', shape: 'Hearts' },
-      { id: 2, index: 1, rank: '2', shape: 'Spades' }
+      { id: 1, index: 0, rank: 'A', shape: 'Hearts', isInitialCard: false },
+      { id: 2, index: 1, rank: '2', shape: 'Spades', isInitialCard: false }
     ],
     aiHandSize: 5,
-    lastUsedCard: { id: 3, index: 0, rank: 'K', shape: 'Diamonds' },
+    lastUsedCard: { id: 3, index: 0, rank: 'K', shape: 'Diamonds', isInitialCard: false },
     deckSize: 30,
     accumulatedDraws: 0,
     isPlayerTurn: true,
@@ -39,7 +40,7 @@ describe('GameBoard.vue', () => {
     message: '',
     playableCardIndices: [0],
     usedCardPile: [
-      { id: 3, index: 0, rank: 'K', shape: 'Diamonds' }
+      { id: 3, index: 0, rank: 'K', shape: 'Diamonds', isInitialCard: true }
     ]
   }
 

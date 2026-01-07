@@ -22,10 +22,12 @@ public record GameEvent(
         MULTIPLE_CARDS_PLAYED,
         TURN_STARTED,
         TURN_ENDED,
+        TURN_KEPT,             // Turn was kept (e.g., after face card) - show transition animation
         GAME_OVER,
         CARDS_DEALT,           // Dealer dealt cards to players
         INITIAL_CARD_PLACED,    // Dealer placed initial card on table
-        GAME_SETUP_COMPLETE     // Game setup finished, ready to play
+        GAME_SETUP_COMPLETE,   // Game setup finished, ready to play
+        NUMSEVEN_SHAPE_SELECTION_REQUIRED  // NumSevenCard played - player must select a shape
     }
     
     // Generic methods that work for both PLAYER and AI
@@ -102,6 +104,17 @@ public record GameEvent(
             EventType.TURN_ENDED,
             actor,
             actor + "'s turn ended",
+            null,
+            null,
+            null
+        );
+    }
+    
+    public static GameEvent turnKept(String actor) {
+        return new GameEvent(
+            EventType.TURN_KEPT,
+            actor,
+            actor + "'s turn continues",
             null,
             null,
             null
@@ -194,6 +207,18 @@ public record GameEvent(
     
     public static GameEvent aiPlayedDefenseCard(Card defendingCard, Card attackingCard, int accumulatedDraws) {
         return playedDefenseCard("AI", defendingCard, attackingCard, accumulatedDraws);
+    }
+    
+    // NumSevenCard shape selection event
+    public static GameEvent numSevenShapeSelectionRequired(Card numSevenCard) {
+        return new GameEvent(
+            EventType.NUMSEVEN_SHAPE_SELECTION_REQUIRED,
+            "PLAYER",
+            "Select a shape for the 7 card",
+            numSevenCard,
+            null,
+            null
+        );
     }
 }
 
