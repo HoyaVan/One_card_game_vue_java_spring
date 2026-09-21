@@ -15,6 +15,7 @@ public class Player implements GameParticipantable {
 
     // For shape selection when playing NumSevenCard (temporary storage)
     private String pendingShapeSelection;
+    private boolean awaitingNumSevenShapeSelection;
 
     public Player() {
         this(null);
@@ -23,6 +24,7 @@ public class Player implements GameParticipantable {
     public Player(final Object ignored) {
         // No longer needs Scanner - actions come from REST API
         this.pendingShapeSelection = null;
+        this.awaitingNumSevenShapeSelection = false;
     }
 
     // Week 2. Exception Handling
@@ -227,6 +229,7 @@ public class Player implements GameParticipantable {
             // Create a new card with the new shape for display
             final NumSevenCard cardWithNewShape = numSevenCard.withShape(newShape);
             gameState.setLastUsedCard(cardWithNewShape);
+            awaitingNumSevenShapeSelection = false;
             GameMessages.display(""); // Newline before "You played" message
             GameMessages.displayFormatted(GameMessages.PLAYER_PLAYED_CARD, numSevenCard);
             GameMessages.displayFormatted(GameMessages.NUMSEVEN_SHAPE_CHANGE, newShape);
@@ -449,8 +452,9 @@ public class Player implements GameParticipantable {
                                             "Face card must match previous card by rank or shape");
                                 }
                             } else {
-                                // Normal card after face card - must match shape
-                                if (!cardsToPlay[i].getShape().equals(currentLastCard.getShape())) {
+                                // Joker ignores the face card's shape; other cards must match it.
+                                if (!(cardsToPlay[i] instanceof JokerCard)
+                                        && !cardsToPlay[i].getShape().equals(currentLastCard.getShape())) {
                                     throw new InvalidMoveException(
                                             "Card must match the shape of the previous face card");
                                 }
@@ -477,11 +481,13 @@ public class Player implements GameParticipantable {
         // Check if NumSevenCard is being played - special handling needed
         boolean hasNumSevenCard = false;
         int numSevenCardIndex = -1;
+        boolean allNumSevenCards = true;
         for (int i = 0; i < cardsToPlay.length; i++) {
             if (cardsToPlay[i] instanceof NumSevenCard) {
                 hasNumSevenCard = true;
                 numSevenCardIndex = i;
-                break;
+            } else {
+                allNumSevenCards = false;
             }
         }
 
@@ -491,7 +497,7 @@ public class Player implements GameParticipantable {
         // 2. It's the first card and matches a face card on the table (lastUsedCard),
         // OR
         // 3. It's the only card being played
-        if (hasNumSevenCard && cardsToPlay.length > 1) {
+        if (hasNumSevenCard && cardsToPlay.length > 1 && !allNumSevenCards) {
             Card numSevenCard = cardsToPlay[numSevenCardIndex];
             String numSevenShape = numSevenCard.getShape();
             boolean allowedWithFaceCards = false;
@@ -514,8 +520,9 @@ public class Player implements GameParticipantable {
                 // This allows sequences like: Q (Spades) -> Q (Hearts) -> K (Hearts) -> 7
                 // (Hearts)
                 // The 7 matches the shape of K (Hearts), which is the last card before it
-                if (cardBeforeNumSeven instanceof FaceCard &&
-                        cardBeforeNumSeven.getShape().equals(numSevenShape)) {
+                if (cardBeforeNumSeven instanceof NumSevenCard ||
+                    (cardBeforeNumSeven instanceof FaceCard &&
+                        cardBeforeNumSeven.getShape().equals(numSevenShape))) {
                     allowedWithFaceCards = true;
                 }
             }
@@ -525,6 +532,7 @@ public class Player implements GameParticipantable {
             }
         }
 
+        boolean awaitingNumSevenShapeSelection = false;
         for (int i = 0; i < cardsToPlay.length; i++) {
             Card card = cardsToPlay[i];
 
@@ -535,15 +543,19 @@ public class Player implements GameParticipantable {
                 throw new InvalidMoveException("Card not found in hand");
             }
 
-            // Handle NumSevenCard specially - it needs shape selection
+            // Apply the 7-card effect once, when the final stacked 7 is played.
             if (card instanceof NumSevenCard) {
-                // NumSevenCard played after face cards - use the shape from the face cards
-                // The shape should match the face cards that were played before it
-                String newShape = card.getShape(); // Use the card's current shape (same as face cards)
-                // Remove card from hand first
+                if (i == cardsToPlay.length - 1 && cardsToPlay.length > 1) {
+                    awaitingNumSevenShapeSelection = true;
+                    break;
+                }
                 gameState.getPlayerHand().remove(currentIndex);
-                // Play with the shape (which matches the face cards)
-                gameRule.playNumSevenCard((NumSevenCard) card, newShape, false);
+                if (i == cardsToPlay.length - 1) {
+                    gameRule.playNumSevenCard((NumSevenCard) card, card.getShape(), false);
+                    GameMessages.displayFormatted(GameMessages.NUMSEVEN_SHAPE_CHANGE, card.getShape());
+                } else {
+                    gameRule.playCard(card, false);
+                }
                 GameMessages.display(""); // Newline before "You played" message
                 GameMessages.displayFormatted(GameMessages.PLAYER_PLAYED_CARD, card);
             } else {
@@ -557,6 +569,10 @@ public class Player implements GameParticipantable {
 
         // Update the last used card (last card played)
         gameState.setLastUsedCard(gameRule.getLastUsedCard());
+
+        if (awaitingNumSevenShapeSelection) {
+            return false;
+        }
 
         // Display accumulated punishment for Attackable cards (NumTwoCard, AceCard,
         // JokerCard)
@@ -647,6 +663,10 @@ public class Player implements GameParticipantable {
 
     public void setPendingShapeSelection(String shape) {
         this.pendingShapeSelection = shape;
+    }
+
+    public boolean isAwaitingNumSevenShapeSelection() {
+        return awaitingNumSevenShapeSelection;
     }
 
     private String mapShapeCode(String code) {

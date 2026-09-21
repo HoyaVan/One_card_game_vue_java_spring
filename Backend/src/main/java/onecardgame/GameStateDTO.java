@@ -1,7 +1,6 @@
 package onecardgame;
 
 import java.util.List;
-
 import onecardgame.cards.Card;
 
 /**
@@ -18,6 +17,7 @@ public record GameStateDTO(
     boolean isInitialTurn,  // Whether this is the initial turn (attack rules don't apply)
     boolean isGameOver,
     String winner,
+    String gameOverReason,
     String message,
     List<Integer> playableCardIndices,  // Indices of playable cards in playerHand
     List<CardInfo> usedCardPile  // All cards in the used card pile (for stacking visualization)
@@ -96,14 +96,19 @@ public record GameStateDTO(
             : null;
         
         String winner = null;
+        String gameOverReason = null;
         if (gameState.isPlayerWinner()) {
             winner = "PLAYER";
+            gameOverReason = "PLAYER_EMPTY_CARDS";
         } else if (gameState.isAIWinner()) {
             winner = "AI";
+            gameOverReason = "AI_EMPTY_CARDS";
         } else if (gameState.isPlayerLoser()) {
             winner = "AI";
+            gameOverReason = "PLAYER_MAX_CARDS";
         } else if (gameState.isAILoser()) {
             winner = "PLAYER";
+            gameOverReason = "AI_MAX_CARDS";
         }
         
         // Calculate playable card indices using backend logic
@@ -140,6 +145,7 @@ public record GameStateDTO(
             gameState.isAIWinner() || gameState.isPlayerWinner() || 
             gameState.isAILoser() || gameState.isPlayerLoser(),
             winner,
+            gameOverReason,
             "",
             playableIndices,
             usedCardPileInfo

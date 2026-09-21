@@ -3,9 +3,19 @@ import { computed } from 'vue'
 
 const props = defineProps<{
     winner: string // "PLAYER" or "AI"
+    reason?: string
 }>()
 
 const isWin = computed(() => props.winner === 'PLAYER')
+const resultMessage = computed(() => {
+    if (isWin.value) {
+        return 'You dropped all your cards!'
+    }
+
+    return props.reason === 'PLAYER_MAX_CARDS'
+        ? 'You reached the maximum card limit.'
+        : 'AI dropped all cards first.'
+})
 </script>
 
 <template>
@@ -13,7 +23,7 @@ const isWin = computed(() => props.winner === 'PLAYER')
         <div class="content">
             <div class="icon">{{ isWin ? '🏆' : '💀' }}</div>
             <h1>{{ isWin ? 'VICTORY!' : 'DEFEAT' }}</h1>
-            <p>{{ isWin ? 'You dropped all your cards!' : 'AI dropped all cards first.' }}</p>
+            <p>{{ resultMessage }}</p>
             <div class="animation-confetti" v-if="isWin"></div>
         </div>
     </div>

@@ -10,6 +10,7 @@ export interface GameState {
     isInitialTurn: boolean  // Whether this is the initial turn (attack rules don't apply)
     isGameOver: boolean
     winner: string | null
+    gameOverReason: string | null
     message: string
     playableCardIndices: number[]  // Indices of playable cards
     usedCardPile: CardInfo[]  // All cards in the used card pile (for stacking)

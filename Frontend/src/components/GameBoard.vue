@@ -15,9 +15,11 @@ const showTurnTransition = ref(false)
 const transitionPlayerName = ref('PLAYER')
 const isBattleSituation = ref(false)
 const battleCardsToDraw = ref(0)
+const isOneCardAnnouncement = ref(false)
 const lastProcessedEventId = ref<string | null>(null)
 const faceCardEffectActive = ref(false) // Track if player kept turn via face card
 const gameOverWinner = ref<string | null>(null) // Track winner for game over animation
+const gameOverReason = ref<string | null>(null)
 
 // NumSevenCard shape selection state
 const showShapeSelection = ref(false)
@@ -80,6 +82,9 @@ watch(() => lastEvents.value, (events) => {
         // Handle NUMSEVEN_SHAPE_SELECTION_REQUIRED event
         if (eventType === 'NUMSEVEN_SHAPE_SELECTION_REQUIRED' && event.actor === 'PLAYER') {
             console.log('🎴 NumSevenCard shape selection required')
+            showTurnTransition.value = false
+            isBattleSituation.value = false
+            battleCardsToDraw.value = 0
             // Extract card info from event
             if (event.cardPlayed) {
                 const cardInfo: CardInfo = {
@@ -106,9 +111,9 @@ watch(() => lastEvents.value, (events) => {
         // Handle TURN_KEPT event (face card was played, turn continues)
         if (eventType === 'TURN_KEPT' && event.actor === 'PLAYER') {
             console.log('🎯 Turn kept - showing transition animation')
-            // Show transition animation indicating turn continues
+            // The player can continue immediately without another blocking overlay.
             transitionPlayerName.value = 'PLAYER'
-            showTurnTransition.value = true
+            showTurnTransition.value = false
             // Transition will auto-hide after animation completes
             return
         }
@@ -119,6 +124,9 @@ watch(() => lastEvents.value, (events) => {
             // Wait a moment for any last animations to finish
             setTimeout(() => {
                 gameOverWinner.value = event.actor || 'UNKNOWN'
+                gameOverReason.value = event.description.includes('PLAYER_MAX_CARDS')
+                    ? 'PLAYER_MAX_CARDS'
+                    : null
             }, 1000)
             return
         }
@@ -267,29 +275,35 @@ watch(() => gameState.value?.isPlayerTurn, async (isPlayerTurn) => {
         isBattleSituation.value = false
         battleCardsToDraw.value = 0
     }
+    isOneCardAnnouncement.value = false
     
-    // Show turn transition
+    // Only block the board while the AI is taking its turn. The player should
+    // be able to act immediately when their turn begins.
     transitionPlayerName.value = isPlayerTurn ? 'PLAYER' : 'AI'
-    showTurnTransition.value = true
-    
+    const shapeSelectionPending = lastEvents.value?.some(event =>
+        String(event.type).toUpperCase() === 'NUMSEVEN_SHAPE_SELECTION_REQUIRED'
+    )
+    showTurnTransition.value = !isPlayerTurn && !showShapeSelection.value && !shapeSelectionPending
+
     // If it's AI's turn and we're not already processing, execute AI turn sequence
-    if (!isPlayerTurn && !isProcessingAITurn.value) {
+    if (!isPlayerTurn && !isProcessingAITurn.value && !showShapeSelection.value && !shapeSelectionPending) {
         processAiTurnSequence()
     }
 }, { immediate: true })
 
 // Process AI turn sequence (handles multiple steps if AI keeps turn e.g. Face Cards)
 async function processAiTurnSequence() {
-    if (isProcessingAITurn.value) return
+    if (isProcessingAITurn.value || showShapeSelection.value) return
     isProcessingAITurn.value = true
     
-    // Initial delay for turn transition (2 seconds)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Initial delay for turn transition (1.4 seconds)
+    await new Promise(resolve => setTimeout(resolve, 1400))
 
     try {
         // Loop while it's valid to keep playing (AI turn, not game over)
         // We check condition at start of loop
-        while (gameState.value && !gameState.value.isPlayerTurn && !gameState.value.isGameOver) {
+         while (gameState.value && !gameState.value.isPlayerTurn &&
+             !gameState.value.isGameOver && !showShapeSelection.value) {
             console.log('🤖 Executing AI turn step...')
             await executeAITurn()
             
@@ -442,6 +456,7 @@ function animateCardDraw(cardsDrawn: number) {
 
 function onTransitionComplete() {
     showTurnTransition.value = false
+    isOneCardAnnouncement.value = false
     
     // After transition completes, check if we need to animate AI actions
     // This happens when AI turn just finished
@@ -483,8 +498,13 @@ async function handleDraw() {
 }
 
 async function handleOneCard() {
-    // One card button clicked - could emit a message or handle differently
-    console.log('One Card! button clicked')
+    if (!gameState.value?.isPlayerTurn || gameState.value.playerHand.length !== 1) {
+        return
+    }
+
+    isOneCardAnnouncement.value = true
+    transitionPlayerName.value = 'PLAYER'
+    showTurnTransition.value = true
 }
 
 async function handlePlayCards(indices: number[]) {
@@ -544,7 +564,14 @@ async function handlePlayCards(indices: number[]) {
     
     // When player plays cards, backend automatically ends turn and advances to AI
     // The watcher will detect the turn change and automatically execute AI turn
-    await playAction(action)
+    const updatedState = await playAction(action)
+    const shapeSelectionPending = lastEvents.value?.some(event =>
+        String(event.type).toUpperCase() === 'NUMSEVEN_SHAPE_SELECTION_REQUIRED'
+    )
+    if (updatedState && !updatedState.isPlayerTurn && !updatedState.isGameOver &&
+        !showShapeSelection.value && !shapeSelectionPending) {
+        await processAiTurnSequence()
+    }
 }
 
 // Handle shape selection for NumSevenCard
@@ -591,14 +618,18 @@ const aiHandCards = computed<CardInfo[]>(() => {
         <!-- Turn Transition Overlay -->
         <TurnTransition 
             v-if="showTurnTransition"
+            :show="showTurnTransition"
             :playerName="transitionPlayerName"
-            :isBattle="isBattleSituation"
+            :isBattleSituation="isBattleSituation"
             :cardsToDraw="battleCardsToDraw"
+            :isOneCardAnnouncement="isOneCardAnnouncement"
+            @transition-complete="onTransitionComplete"
         />
 
         <GameOverOverlay
             v-if="gameOverWinner"
             :winner="gameOverWinner"
+            :reason="gameOverReason || undefined"
         />
         
         <!-- NumSevenCard Shape Selection Modal -->

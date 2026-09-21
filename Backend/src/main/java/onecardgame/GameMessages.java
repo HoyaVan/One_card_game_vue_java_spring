@@ -103,11 +103,11 @@ public final class GameMessages {
     public static final String PLAYERS_FINAL_HAND = "Player's final hand:\n";
     public static final String PLAYER_WON_NO_CARDS = "Player won, they have no cards left.\n";
     public static final String PLAYER_HAS_NO_CARDS = "Player has no cards left.";
-    public static final String PLAYER_LOST_TOO_MANY_CARDS = "Player lost, they have 18 or more cards.\n";
+    public static final String PLAYER_LOST_TOO_MANY_CARDS = "You reached the maximum card limit and lost.\n";
     public static final String AI_FINAL_HAND = "AI's final hand:\n";
     public static final String AI_WON_NO_CARDS = "AI won, they have no cards left.\n";
     public static final String AI_HAS_NO_CARDS = "AI has no cards left.";
-    public static final String AI_LOST_TOO_MANY_CARDS = "AI lost, they have 18 or more cards.\n";
+    public static final String AI_LOST_TOO_MANY_CARDS = "AI reached the maximum card limit and lost.\n";
     public static final String END_OF_GAME = "End of game.";
     public static final String FINAL_HANDS_WRITTEN_TO_FILE = "Final hands written to file: %s";
     public static final String ERROR_WRITING_TO_FILE = "An error occurred while writing to the file: %s";

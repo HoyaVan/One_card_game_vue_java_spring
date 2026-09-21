@@ -33,12 +33,12 @@ export function isDefenseCard(card: CardInfo, attackCard: CardInfo | null): bool
     // Joker can defend against any attack
     if (cardRank === 'joker') return true
     
-    // Ace can defend against Ace (same shape) or 2
+    // Ace can defend against another Ace regardless of shape, or a 2 of the same shape
     if (cardRank === 'ace') {
         if (attackRank === 'ace') {
-            return card.shape.toLowerCase() === attackCard.shape.toLowerCase()
+            return true
         }
-        return true // Ace can defend against 2
+        return card.shape.toLowerCase() === attackCard.shape.toLowerCase()
     }
     
     // 2 can defend against 2 (same rank AND same shape)

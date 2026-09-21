@@ -122,10 +122,14 @@ public record GameEvent(
     }
     
     public static GameEvent gameOver(String winner) {
+        return gameOver(winner, null);
+    }
+
+    public static GameEvent gameOver(String winner, String reason) {
         return new GameEvent(
             EventType.GAME_OVER,
             winner,
-            "Game over! Winner: " + winner,
+            "Game over! Winner: " + winner + (reason != null ? "; Reason: " + reason : ""),
             null,
             null,
             null

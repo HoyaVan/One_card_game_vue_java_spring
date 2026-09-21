@@ -1,15 +1,14 @@
 package onecardgame;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import onecardgame.cards.Card;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import onecardgame.cards.Card;
 
 @RestController
 @RequestMapping("/games/onecard")
@@ -146,6 +145,21 @@ public class OneCardGameController {
             int playerHandSizeBefore = game.getGameState().getPlayerHand().size();
             int accumulatedDrawsBefore = game.getGameRule().getAccumulatedDraws();
             boolean wasUnderAttack = game.getGameRule().wasLastCardAttack();
+            Card finalSelectedCard = null;
+            if (action.contains(",")) {
+                String[] selectedIndices = action.split(",");
+                try {
+                    int finalIndex = Integer.parseInt(selectedIndices[selectedIndices.length - 1].trim()) - 1;
+                    if (finalIndex >= 0 && finalIndex < game.getGameState().getPlayerHand().size()) {
+                        Card selectedCard = game.getGameState().getPlayerHand().get(finalIndex);
+                        if (selectedCard instanceof onecardgame.cards.NumSevenCard) {
+                            finalSelectedCard = selectedCard;
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // Player action validation will report malformed indices.
+                }
+            }
 
             boolean valid = game.processPlayerAction(action);
 
@@ -159,10 +173,14 @@ public class OneCardGameController {
             // Build events list for Vue to animate
             java.util.List<GameEvent> events = new java.util.ArrayList<>();
 
+            if (finalSelectedCard != null && game.getGameState().getPlayerHand().contains(finalSelectedCard)) {
+                events.add(GameEvent.numSevenShapeSelectionRequired(finalSelectedCard));
+            }
+
             if (!valid || game.isGameOver()) {
                 String winner = dto.winner();
                 String message = winner != null ? "Game over! Winner: " + winner : "Game over!";
-                events.add(GameEvent.gameOver(winner != null ? winner : "UNKNOWN"));
+                events.add(GameEvent.gameOver(winner != null ? winner : "UNKNOWN", dto.gameOverReason()));
                 return ResponseEntity.ok(new GameResponse(dto, false, message, events));
             }
 
@@ -278,7 +296,7 @@ public class OneCardGameController {
                         game.getDealer());
                 String winner = dto.winner();
                 java.util.List<GameEvent> events = java.util.List.of(
-                        GameEvent.gameOver(winner != null ? winner : "UNKNOWN"));
+                        GameEvent.gameOver(winner != null ? winner : "UNKNOWN", dto.gameOverReason()));
                 return ResponseEntity.ok(new GameResponse(dto, false, "Game over!", events));
             }
 
@@ -392,7 +410,7 @@ public class OneCardGameController {
 
             if (game.isGameOver()) {
                 String winner = dto.winner();
-                events.add(GameEvent.gameOver(winner != null ? winner : "UNKNOWN"));
+                events.add(GameEvent.gameOver(winner != null ? winner : "UNKNOWN", dto.gameOverReason()));
                 return ResponseEntity.ok(new GameResponse(dto, false, "Game over!", events));
             }
 

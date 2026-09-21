@@ -308,6 +308,9 @@
             } else {
                 // Adding a normal card - must match the shape of the last selected card
                 const lastSelected = selectedCards[selectedCards.length - 1]
+                if (card.rank.toLowerCase() === 'joker') {
+                    return true
+                }
                 return card.shape.toLowerCase() === lastSelected.shape.toLowerCase()
             }
         } else {

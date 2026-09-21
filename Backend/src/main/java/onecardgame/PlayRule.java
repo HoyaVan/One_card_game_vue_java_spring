@@ -1,7 +1,6 @@
 package onecardgame;
 
 import java.util.List;
-
 import onecardgame.cards.AceCard;
 import onecardgame.cards.Attackable;
 import onecardgame.cards.Card;
@@ -176,7 +175,10 @@ public class PlayRule {
         if (card instanceof AceCard) {
             // Ace can defend against NumTwo (if same shape) or Ace (same value, if same
             // shape)
-            if (lastUsedCard instanceof NumTwoCard || lastUsedCard instanceof AceCard) {
+            if (lastUsedCard instanceof AceCard) {
+                return true;
+            }
+            if (lastUsedCard instanceof NumTwoCard) {
                 return card.getShape().equals(lastUsedCard.getShape());
             }
             // Ace cannot defend against Joker (punishment 3 < 5)
@@ -320,7 +322,10 @@ public class PlayRule {
             if (cardToPlay instanceof AceCard) {
                 // Ace can defend against NumTwo (if same shape) or Ace (if same shape)
                 // But NOT Joker (punishment check above already prevents this)
-                if (lastUsedCard instanceof NumTwoCard || lastUsedCard instanceof AceCard) {
+                if (lastUsedCard instanceof AceCard) {
+                    return true;
+                }
+                if (lastUsedCard instanceof NumTwoCard) {
                     return cardToPlay.getShape().equals(lastUsedCard.getShape());
                 }
                 // If lastUsedCard is Joker, punishment check above should have failed, but be

@@ -6,6 +6,7 @@ const props = defineProps<{
     playerName: string  // "PLAYER" or "AI"
     isBattleSituation?: boolean  // Whether AI is drawing cards during battle (under attack)
     cardsToDraw?: number  // Number of cards AI must draw during battle
+    isOneCardAnnouncement?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -58,9 +59,9 @@ watch(() => props.show, (newValue) => {
         // Auto-hide after animation completes
         setTimeout(() => {
             emit('transition-complete')
-        }, 2000) // Match animation duration
+        }, 1400) // Match animation duration
     }
-})
+}, { immediate: true })
 
 // Preload audio
 onMounted(() => {
@@ -76,7 +77,10 @@ onMounted(() => {
             <div class="turn-content" :class="{ 'battle-situation': isBattleSituation }">
                 <div class="turn-icon">{{ isBattleSituation ? '⚔️' : '🎮' }}</div>
                 <h2 class="turn-text">
-                    <template v-if="isBattleSituation && playerName === 'AI'">
+                    <template v-if="isOneCardAnnouncement">
+                        ONE CARD!
+                    </template>
+                    <template v-else-if="isBattleSituation && playerName === 'AI'">
                         AI Under Attack!
                     </template>
                     <template v-else>
@@ -84,7 +88,10 @@ onMounted(() => {
                     </template>
                 </h2>
                 <div class="turn-subtitle">
-                    <template v-if="isBattleSituation && playerName === 'AI'">
+                    <template v-if="isOneCardAnnouncement">
+                        One card remaining. Keep going!
+                    </template>
+                    <template v-else-if="isBattleSituation && playerName === 'AI'">
                         AI must draw {{ cardsToDraw || 0 }} card(s) or defend!
                     </template>
                     <template v-else>
@@ -205,7 +212,7 @@ onMounted(() => {
 }
 
 .turn-transition-leave-active {
-    transition: opacity 0.3s ease 1.7s; /* Delay fade out until animation completes */
+    transition: opacity 0.3s ease 1.1s; /* Delay fade out until animation completes */
 }
 
 .turn-transition-enter-from,

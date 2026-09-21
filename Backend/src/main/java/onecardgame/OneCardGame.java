@@ -108,6 +108,8 @@ public class OneCardGame {
 
         // Execute player's action
         player.takeTurn(gameState, gameRule, dealer, dealer.isInitialTurn(), normalizedAction);
+        final boolean awaitingNumSevenShapeSelection = player instanceof Player currentPlayer
+            && currentPlayer.isAwaitingNumSevenShapeSelection();
 
         // After first card is played, isInitialTurn should be set to false
         if (wasInitialTurn) {
@@ -139,7 +141,7 @@ public class OneCardGame {
 
         // After any action (draw or play cards), automatically advance to AI turn
         // UNLESS face card was played and player had to draw (then keep player's turn)
-        if (!shouldKeepTurn) {
+        if (!shouldKeepTurn && !awaitingNumSevenShapeSelection) {
             // Vue will call /ai-turn endpoint separately for step-by-step visualization
             dealer.advanceToNextPlayer();
         }
