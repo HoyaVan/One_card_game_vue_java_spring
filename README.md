@@ -1,8 +1,6 @@
 # One Card Game
 
-This repository contains two ways to play the card game:
-
-- **Vue version:** browser interface with a Spring Boot backend and AI opponent.
+**Vue version:** browser interface with a Spring Boot backend and an AI opponent.
 
 ## Preview
 ![alt text](<one card game.gif>)
@@ -61,7 +59,7 @@ In the Vue version, select playable cards in your hand and use the play or draw 
 
 ## AI Behavior Logic
 
-The AI makes its own decisions during its turn. Its behavior combines deterministic priorities with probability-based choices so that it does not play identically every time.
+The AI makes its own decisions during its turn. Its behavior combines deterministic priorities with probabilistic choices, so it does not play identically every time.
 
 ### 1. When under attack
 
@@ -73,7 +71,7 @@ The AI makes its own decisions during its turn. Its behavior combines determinis
 ### 2. Choosing a normal play
 
 - If a normal, non-attack card is playable, the AI always prefers to play it.
-- If only attack cards are playable, the AI plays one with a 65% probability; otherwise it draws one card.
+- If only attack cards are playable, the AI plays one with a 65% probability; otherwise, it draws one card.
 - A Joker remains wild during normal play and can match any card.
 
 ### 3. Playing a 7
@@ -102,7 +100,7 @@ The AI considers a playable 7 when changing the active suit is strategically use
 
 ### 6. Drawing
 
-If the AI has no suitable play, or its probability check chooses not to play, it draws one card and ends its turn. When under attack, it draws the full accumulated penalty instead of drawing only one card.
+If the AI has no suitable play or its probability check results in not playing, it draws one card and ends its turn. When under attack, it draws the full accumulated penalty instead of drawing only one card.
 
 ## Project Locations
 
